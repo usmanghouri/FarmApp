@@ -8,16 +8,13 @@ import {
   TextInput,
   Image,
   TouchableOpacity,
-  ScrollView
+  ScrollView,
 } from "react-native";
 import { apiClient } from "../api/client";
 import { COLORS, SHADOWS, RADIUS } from "../styles/theme";
+import { Ionicons } from '@expo/vector-icons'; 
 
 // Mobile version of src/pages/FarmerProducts.jsx
-// Uses the same APIs:
-//  - GET  /api/products/productForFarmer
-//  - POST /api/cart/add
-//  - POST /api/wishlist/add
 
 const CATEGORIES = [
   { id: "all", name: "All Products" },
@@ -25,7 +22,7 @@ const CATEGORIES = [
   { id: "vegetables", name: "Vegetables" },
   { id: "crops", name: "Crops" },
   { id: "pesticides", name: "Pesticides" },
-  { id: "fertilizer", name: "Fertilizer" }
+  { id: "fertilizer", name: "Fertilizer" },
 ];
 
 export default function FarmerProductsScreen() {
@@ -47,6 +44,9 @@ export default function FarmerProductsScreen() {
           { withCredentials: true }
         );
         setProducts(res.data?.products || []);
+
+        // Fetch wishlist IDs if necessary
+        
       } catch (err) {
         const msg =
           err?.response?.data?.message || err.message || "Failed to load products";
@@ -73,43 +73,54 @@ export default function FarmerProductsScreen() {
     });
   }, [products, searchTerm, activeCategory]);
 
+  const triggerActionMessage = (msg) => {
+    setActionMessage(msg);
+    setTimeout(() => setActionMessage(""), 2000);
+  };
+
   const addToCart = async (productId) => {
     try {
-      setActionMessage("");
       await apiClient.post(
         "/api/cart/add",
         { productId, quantity: 1 },
         { withCredentials: true }
       );
-      setActionMessage("Added to cart");
+      triggerActionMessage("Product added to cart successfully!");
     } catch (err) {
       const msg =
         err?.response?.data?.message || err.message || "Failed to add to cart";
-      setActionMessage(msg);
+      triggerActionMessage(msg);
     }
   };
 
   const addToWishlist = async (productId) => {
     try {
-      setActionMessage("");
-      await apiClient.post(
+      const isCurrentlyInWishlist = wishlistIds.includes(productId);
+      
+      await apiClient.post( 
         "/api/wishlist/add",
         { productId },
         { withCredentials: true }
       );
-      setWishlistIds(prev => [...prev, productId]);
-      setActionMessage("Added to wishlist");
+      
+      if (isCurrentlyInWishlist) {
+        setWishlistIds(prev => prev.filter(id => id !== productId));
+        triggerActionMessage("Removed from wishlist.");
+      } else {
+        setWishlistIds(prev => [...prev, productId]);
+        triggerActionMessage("Added to wishlist!");
+      }
     } catch (err) {
       const msg =
-        err?.response?.data?.message || err.message || "Failed to add to wishlist";
-      setActionMessage(msg);
+        err?.response?.data?.message || err.message || "Failed to modify wishlist";
+      triggerActionMessage(msg);
     }
   };
 
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#16a34a" />
+        <ActivityIndicator size="large" color={COLORS.primary} />
         <Text style={styles.loadingText}>Loading products...</Text>
       </View>
     );
@@ -126,12 +137,13 @@ export default function FarmerProductsScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.heading}>Browse Products</Text>
+      <Text style={styles.heading}>Marketplace Products</Text>
 
       {/* Search bar */}
       <View style={styles.searchContainer}>
         <TextInput
-          placeholder="Search products..."
+          placeholder="Search products, category or unit..."
+          placeholderTextColor={COLORS.muted}
           value={searchTerm}
           onChangeText={setSearchTerm}
           style={styles.searchInput}
@@ -190,23 +202,31 @@ export default function FarmerProductsScreen() {
                   />
                 ) : (
                   <View style={styles.imagePlaceholder}>
+                    <Ionicons name="image-outline" size={30} color={COLORS.muted} />
                     <Text style={styles.imagePlaceholderText}>No image</Text>
                   </View>
                 )}
+                
+                {/* Out of Stock Badge */}
                 {!item.isAvailable && (
                   <View style={styles.badgeOut}>
-                    <Text style={styles.badgeOutText}>Out of stock</Text>
+                    <Text style={styles.badgeOutText}>OUT OF STOCK</Text>
                   </View>
                 )}
+                
+                {/* Wishlist Button (FIXED) */}
                 <TouchableOpacity
                   style={styles.wishlistButton}
                   onPress={() => addToWishlist(item._id)}
                 >
-                  <Text style={{ color: inWishlist ? "red" : "#6b7280" }}>
-                    ♥
-                  </Text>
+                  <Ionicons 
+                    name={inWishlist ? "heart" : "heart-outline"} // Toggled Icon
+                    size={24}
+                    color={inWishlist ? COLORS.danger : COLORS.muted} // Toggled Color
+                  />
                 </TouchableOpacity>
               </View>
+              
               <View style={styles.cardBody}>
                 <View style={styles.cardHeaderRow}>
                   <Text
@@ -267,210 +287,236 @@ export default function FarmerProductsScreen() {
 }
 
 const styles = StyleSheet.create({
+  // --- Global Container ---
   container: {
     flex: 1,
     paddingHorizontal: 16,
     paddingTop: 16,
-    backgroundColor: COLORS.background
+    // IMPROVEMENT: Soft green background for the screen
+    backgroundColor: '#F0FFF0', 
   },
   heading: {
-    fontSize: 22,
-    fontWeight: "700",
+    fontSize: 24, 
+    fontWeight: "800",
     color: COLORS.primaryDark,
-    marginBottom: 12
+    marginBottom: 16,
+    textAlign: 'center',
   },
+  // --- Search Bar ---
   searchContainer: {
-    marginBottom: 8
+    marginBottom: 12,
   },
   searchInput: {
     borderWidth: 1,
     borderColor: COLORS.border,
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    borderRadius: RADIUS.pill, 
+    paddingHorizontal: 18,
+    paddingVertical: 10, 
     backgroundColor: COLORS.surface,
-    fontSize: 14
+    fontSize: 15,
+    color: COLORS.mutedDark,
   },
-  categoryRow: {
-    marginVertical: 8
+  // --- Category Chips (FIXED) ---
+ categoryRow: {
+    marginVertical: 8,
+    marginBottom: 16,
+    paddingHorizontal: 5, // Added padding to give chips breathing room from edges
   },
   categoryChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    // INCREASED padding for a more uniform, button-like appearance
+    paddingHorizontal: 14, 
+    paddingVertical: 8, 
     borderRadius: RADIUS.pill,
-    backgroundColor: "#e5e7eb",
-    marginRight: 8
+    // Soft, slightly visible background for inactive chips
+    backgroundColor: '#E7EBE8', 
+    marginRight: 10, // Increased margin for visual separation
+    // Ensure the chip layout respects its content exactly
+    // (This is the default but good to verify if you run into flex issues)
+    alignSelf: 'flex-start', 
   },
   categoryChipActive: {
-    backgroundColor: "#16a34a"
+    backgroundColor: COLORS.primary, // Primary color for active chip
+    // Add subtle lift/shadow to the active chip
+    ...SHADOWS.soft, 
+    elevation: 3, // Android lift
   },
   categoryText: {
-    fontSize: 13,
-    color: "#374151"
+    fontSize: 14, // Slightly larger font size
+    // PrimaryDark for high contrast against the light chip background
+    color: COLORS.primaryDark, 
+    fontWeight: '600',
   },
   categoryTextActive: {
-    color: "#ffffff"
+    color: COLORS.surface, // White text for active
+    fontWeight: '700', // Bolder font
   },
   actionMessage: {
-    fontSize: 12,
-    color: "#16a34a",
-    marginBottom: 4
+    fontSize: 14,
+    color: COLORS.success, 
+    marginBottom: 12,
+    textAlign: 'center',
+    fontWeight: '600',
   },
+  // --- Product Grid ---
   listContent: {
-    paddingBottom: 16
+    paddingBottom: 24,
   },
   columnWrapper: {
-    justifyContent: "space-between"
+    justifyContent: "space-between",
   },
   card: {
     backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.md,
-    marginBottom: 12,
+    borderRadius: RADIUS.lg, 
+    marginBottom: 16,
     width: "48%",
     overflow: "hidden",
-    ...SHADOWS.card
+    ...SHADOWS.soft, 
   },
+  // --- Image Area ---
   imageWrapper: {
-    height: 120,
-    backgroundColor: "#e5e7eb"
+    height: 140, 
+    backgroundColor: COLORS.border, 
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
   },
   image: {
     width: "100%",
-    height: "100%"
-  },
-  imagePlaceholder: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center"
+    height: "100%",
   },
   imagePlaceholderText: {
-    fontSize: 12,
-    color: "#9ca3af"
+    fontSize: 13,
+    color: COLORS.muted,
   },
   badgeOut: {
     position: "absolute",
-    top: 6,
-    right: 6,
-    backgroundColor: "#ef4444",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 999
+    top: 10,
+    right: 10,
+    backgroundColor: COLORS.danger, 
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: RADIUS.pill,
   },
   badgeOutText: {
-    color: "#ffffff",
-    fontSize: 10,
-    fontWeight: "600"
+    color: COLORS.surface,
+    fontSize: 11,
+    fontWeight: "700",
   },
   wishlistButton: {
     position: "absolute",
-    top: 6,
-    left: 6,
-    padding: 4,
-    backgroundColor: "rgba(255,255,255,0.9)",
-    borderRadius: 999
+    top: 10,
+    left: 10,
+    padding: 6,
+    backgroundColor: COLORS.surface, 
+    borderRadius: RADIUS.pill,
+    ...SHADOWS.soft,
   },
+  // --- Card Body ---
   cardBody: {
-    paddingHorizontal: 10,
-    paddingVertical: 8
+    paddingHorizontal: 12, 
+    paddingVertical: 10,
   },
   cardHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 4
+    marginBottom: 6,
   },
   productName: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#111827",
+    fontSize: 16,
+    fontWeight: "700",
+    color: COLORS.mutedDark,
     flex: 1,
-    marginRight: 4
+    marginRight: 6,
   },
   quantityBadge: {
-    fontSize: 10,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    backgroundColor: "#dcfce7",
-    color: "#166534",
-    borderRadius: 999
+    fontSize: 11,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    backgroundColor: COLORS.accent, 
+    color: COLORS.primaryDark,
+    borderRadius: RADIUS.pill,
+    fontWeight: '600',
   },
   priceRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 4
+    marginBottom: 8,
   },
   priceText: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#16a34a"
+    fontSize: 16,
+    fontWeight: "800",
+    color: COLORS.primary, 
   },
   categoryBadge: {
-    fontSize: 10,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    backgroundColor: "#dbeafe",
-    color: "#1d4ed8",
-    borderRadius: 999
+    fontSize: 11,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    backgroundColor: COLORS.info,
+    color: COLORS.surface,
+    borderRadius: RADIUS.pill,
+    fontWeight: '600',
   },
   descriptionText: {
-    fontSize: 11,
-    color: "#6b7280",
-    marginBottom: 6
+    fontSize: 12,
+    color: COLORS.muted,
+    marginBottom: 10,
+    lineHeight: 16,
   },
   footerRow: {
-    alignItems: "center"
+    alignItems: "stretch", 
   },
   cartButton: {
     backgroundColor: COLORS.primary,
     borderRadius: RADIUS.pill,
-    paddingVertical: 6,
-    alignItems: "center"
+    paddingVertical: 8, 
+    alignItems: "center",
   },
   cartButtonDisabled: {
-    backgroundColor: "#9ca3af"
+    backgroundColor: COLORS.muted, 
   },
   cartButtonText: {
-    color: "#ffffff",
-    fontSize: 12,
-    fontWeight: "600"
+    color: COLORS.surface,
+    fontSize: 14,
+    fontWeight: "700",
   },
+  // --- Utility Styles ---
   centered: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    padding: 24
+    padding: 24,
+    backgroundColor: '#F0FFF0',
   },
   loadingText: {
     marginTop: 8,
-    color: "#4b5563"
+    color: COLORS.mutedDark,
   },
   errorTitle: {
     fontSize: 16,
-    fontWeight: "600",
-    color: "#b91c1c",
-    marginBottom: 4
+    fontWeight: "700",
+    color: COLORS.danger,
+    marginBottom: 4,
   },
   errorText: {
-    fontSize: 13,
-    color: "#4b5563",
-    textAlign: "center"
+    fontSize: 14,
+    color: COLORS.mutedDark,
+    textAlign: "center",
   },
   emptyState: {
     paddingVertical: 40,
-    alignItems: "center"
+    alignItems: "center",
   },
   emptyTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#111827",
-    marginBottom: 4
+    fontSize: 18,
+    fontWeight: "700",
+    color: COLORS.mutedDark,
+    marginBottom: 4,
   },
   emptyText: {
-    fontSize: 13,
-    color: "#6b7280",
-    textAlign: "center"
-  }
+    fontSize: 14,
+    color: COLORS.muted,
+    textAlign: "center",
+  },
 });
-
-

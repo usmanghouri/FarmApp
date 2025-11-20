@@ -8,10 +8,14 @@ import {
   TouchableOpacity,
   Image,
   TextInput,
-  ScrollView
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  Alert,
 } from "react-native";
 import { apiClient } from "../api/client";
 import { COLORS, SHADOWS, RADIUS } from "../styles/theme";
+import { Feather, Ionicons } from '@expo/vector-icons'; // Added for icons
 
 // APIs used: cart/my-cart, cart/update, cart/item/:productId, cart/clear, order/place-order
 
@@ -22,8 +26,15 @@ const checkoutEmptyState = {
   city: "",
   zipCode: "",
   notes: "",
-  paymentMethod: "cash-on-delivery"
+  paymentMethod: "cash-on-delivery",
 };
+
+// Payment mapping for display
+const PAYMENT_METHODS = [
+    { key: "cash-on-delivery", name: "Cash on Delivery" },
+    { key: "easypaisa", name: "EasyPaisa" },
+    { key: "jazzcash", name: "JazzCash" },
+];
 
 export default function ShoppingCartScreen({ navigation }) {
   const [cartItems, setCartItems] = useState([]);
@@ -99,26 +110,36 @@ export default function ShoppingCartScreen({ navigation }) {
   };
 
   const removeItem = async (productId) => {
-    try {
-      setActionMessage("");
-      await apiClient.delete(`/api/cart/item/${productId}`, { withCredentials: true });
-      setCartItems((prev) => prev.filter((item) => item.productId !== productId));
-    } catch (err) {
-      const msg = err?.response?.data?.message || err.message || "Failed to remove item";
-      setActionMessage(msg);
-    }
+    Alert.alert("Remove Item", "Are you sure you want to remove this item?", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Remove", style: "destructive", onPress: async () => {
+        try {
+          setActionMessage("");
+          await apiClient.delete(`/api/cart/item/${productId}`, { withCredentials: true });
+          setCartItems((prev) => prev.filter((item) => item.productId !== productId));
+        } catch (err) {
+          const msg = err?.response?.data?.message || err.message || "Failed to remove item";
+          setActionMessage(msg);
+        }
+      }}
+    ]);
   };
 
   const clearCart = async () => {
-    try {
-      setActionMessage("");
-      await apiClient.delete("/api/cart/clear", { withCredentials: true });
-      setCartItems([]);
-      setCartId(null);
-    } catch (err) {
-      const msg = err?.response?.data?.message || err.message || "Failed to clear cart";
-      setActionMessage(msg);
-    }
+    Alert.alert("Clear Cart", "Are you sure you want to remove all items?", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Clear", style: "destructive", onPress: async () => {
+        try {
+          setActionMessage("");
+          await apiClient.delete("/api/cart/clear", { withCredentials: true });
+          setCartItems([]);
+          setCartId(null);
+        } catch (err) {
+          const msg = err?.response?.data?.message || err.message || "Failed to clear cart";
+          setActionMessage(msg);
+        }
+      }}
+    ]);
   };
 
   const handleCheckoutChange = (field, value) => {
@@ -130,6 +151,12 @@ export default function ShoppingCartScreen({ navigation }) {
       setActionMessage("No cart found");
       return;
     }
+    // Basic validation
+    if (!checkoutForm.fullName || !checkoutForm.street || !checkoutForm.city || !checkoutForm.phoneNumber) {
+        setActionMessage("Please fill in all required delivery details.");
+        return;
+    }
+
     try {
       setActionMessage("");
       await apiClient.post(
@@ -145,11 +172,13 @@ export default function ShoppingCartScreen({ navigation }) {
         },
         { withCredentials: true }
       );
-      setActionMessage("Order placed successfully");
+      setActionMessage("Order placed successfully! Redirecting...");
       setCheckoutVisible(false);
       setCheckoutForm(checkoutEmptyState);
       fetchCart();
-      navigation?.navigate?.("MyOrders");
+      
+      // Navigate to order history or confirmation page
+      navigation?.navigate?.("MyOrders"); 
     } catch (err) {
       const msg = err?.response?.data?.message || err.message || "Failed to place order";
       setActionMessage(msg);
@@ -159,7 +188,7 @@ export default function ShoppingCartScreen({ navigation }) {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#16a34a" />
+        <ActivityIndicator size="large" color={COLORS.primary} />
         <Text style={styles.loadingText}>Loading cart...</Text>
       </View>
     );
@@ -178,209 +207,243 @@ export default function ShoppingCartScreen({ navigation }) {
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.headerRow}>
-        <Text style={styles.heading}>Your Shopping Cart</Text>
-        {cartItems.length > 0 && (
-          <TouchableOpacity style={styles.clearButton} onPress={clearCart}>
-            <Text style={styles.clearButtonText}>Clear Cart</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {actionMessage ? (
-        <Text style={styles.actionMessage}>{actionMessage}</Text>
-      ) : null}
-
-      {cartItems.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyTitle}>Your cart is empty</Text>
-          <Text style={styles.emptyText}>
-            Add items from the marketplace to get started.
-          </Text>
-          <TouchableOpacity
-            style={styles.primaryButton}
-            onPress={() => navigation?.navigate?.("FarmerProducts")}
-          >
-            <Text style={styles.primaryButtonText}>Browse Products</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <>
-          <FlatList
-            data={cartItems}
-            keyExtractor={(item) => item.cartItemId}
-            contentContainerStyle={{ paddingBottom: 16 }}
-            renderItem={({ item }) => (
-              <View style={styles.card}>
-                <View style={styles.cardRow}>
-                  <View style={styles.imageWrapper}>
-                    {item.images?.[0] ? (
-                      <Image source={{ uri: item.images[0] }} style={styles.image} />
-                    ) : (
-                      <View style={styles.imagePlaceholder}>
-                        <Text style={styles.imagePlaceholderText}>No image</Text>
-                      </View>
-                    )}
-                  </View>
-                  <View style={{ flex: 1, marginLeft: 12 }}>
-                    <Text style={styles.productName}>{item.name}</Text>
-                    <Text style={styles.productMeta}>
-                      {item.category} • {item.unit}
-                    </Text>
-                    <Text style={styles.productMeta}>
-                      Seller: {item.seller?.uploaderName || "Unknown"}
-                    </Text>
-                    <Text style={styles.priceText}>
-                      Rs. {(item.price || 0).toLocaleString()}
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.actionsRow}>
-                  <View style={styles.quantityControl}>
-                    <TouchableOpacity
-                      onPress={() => updateQuantity(item.productId, item.quantity - 1)}
-                      style={styles.quantityButton}
-                    >
-                      <Text style={styles.quantityButtonText}>-</Text>
+    <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        keyboardVerticalOffset={80}
+    >
+        <View style={styles.container}>
+            <View style={styles.headerRow}>
+                <Text style={styles.heading}>Your Shopping Cart</Text>
+                {cartItems.length > 0 && (
+                    <TouchableOpacity style={styles.clearButton} onPress={clearCart}>
+                         <Feather name="trash-2" size={14} color={COLORS.danger} />
+                        <Text style={styles.clearButtonText}>Clear Cart</Text>
                     </TouchableOpacity>
-                    <Text style={styles.quantityValue}>{item.quantity}</Text>
-                    <TouchableOpacity
-                      onPress={() => updateQuantity(item.productId, item.quantity + 1)}
-                      style={styles.quantityButton}
-                    >
-                      <Text style={styles.quantityButtonText}>+</Text>
-                    </TouchableOpacity>
-                  </View>
-                  <TouchableOpacity
-                    style={styles.removeButton}
-                    onPress={() => removeItem(item.productId)}
-                  >
-                    <Text style={styles.removeButtonText}>Remove</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
-          />
-
-          <View style={styles.summaryCard}>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Total</Text>
-              <Text style={styles.summaryValue}>Rs. {total.toLocaleString()}</Text>
+                )}
             </View>
-            <TouchableOpacity
-              style={styles.primaryButton}
-              onPress={() => setCheckoutVisible((prev) => !prev)}
-            >
-              <Text style={styles.primaryButtonText}>
-                {checkoutVisible ? "Hide Checkout" : "Proceed to Checkout"}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.secondaryButton}
-              onPress={() => navigation?.navigate?.("FarmerProducts")}
-            >
-              <Text style={styles.secondaryButtonText}>Continue Shopping</Text>
-            </TouchableOpacity>
-          </View>
-        </>
-      )}
 
-      {checkoutVisible && cartItems.length > 0 && (
-        <ScrollView style={styles.checkoutCard}>
-          <Text style={styles.checkoutTitle}>Checkout</Text>
-
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Full Name</Text>
-            <TextInput
-              style={styles.input}
-              value={checkoutForm.fullName}
-              onChangeText={(t) => handleCheckoutChange("fullName", t)}
-            />
-          </View>
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Phone Number</Text>
-            <TextInput
-              style={styles.input}
-              value={checkoutForm.phoneNumber}
-              onChangeText={(t) => handleCheckoutChange("phoneNumber", t)}
-              keyboardType="phone-pad"
-            />
-          </View>
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Street</Text>
-            <TextInput
-              style={styles.input}
-              value={checkoutForm.street}
-              onChangeText={(t) => handleCheckoutChange("street", t)}
-            />
-          </View>
-          <View style={styles.formRow}>
-            <View style={{ flex: 1, marginRight: 8 }}>
-              <Text style={styles.label}>City</Text>
-              <TextInput
-                style={styles.input}
-                value={checkoutForm.city}
-                onChangeText={(t) => handleCheckoutChange("city", t)}
-              />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.label}>Zip code</Text>
-              <TextInput
-                style={styles.input}
-                value={checkoutForm.zipCode}
-                onChangeText={(t) => handleCheckoutChange("zipCode", t)}
-                keyboardType="numeric"
-              />
-            </View>
-          </View>
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Notes</Text>
-            <TextInput
-              style={[styles.input, { height: 70, textAlignVertical: "top" }]}
-              multiline
-              value={checkoutForm.notes}
-              onChangeText={(t) => handleCheckoutChange("notes", t)}
-            />
-          </View>
-
-          <Text style={[styles.label, { marginTop: 4 }]}>Payment Method</Text>
-          <View style={styles.paymentRow}>
-            {["cash-on-delivery", "easypaisa", "jazzcash"].map((method) => (
-              <TouchableOpacity
-                key={method}
-                style={[
-                  styles.paymentChip,
-                  checkoutForm.paymentMethod === method && styles.paymentChipActive
-                ]}
-                onPress={() => handleCheckoutChange("paymentMethod", method)}
-              >
-                <Text
-                  style={[
-                    styles.paymentChipText,
-                    checkoutForm.paymentMethod === method && styles.paymentChipTextActive
-                  ]}
-                >
-                  {method.replace(/-/g, " ")}
+            {actionMessage ? (
+                <Text style={[styles.actionMessage, actionMessage.includes("Failed") || actionMessage.includes("Error") ? styles.actionMessageDanger : styles.actionMessageSuccess]}>
+                    {actionMessage}
                 </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+            ) : null}
 
-          <TouchableOpacity style={styles.primaryButton} onPress={placeOrder}>
-            <Text style={styles.primaryButtonText}>Place Order</Text>
-          </TouchableOpacity>
-        </ScrollView>
-      )}
-    </View>
+            {cartItems.length === 0 ? (
+                <View style={styles.emptyState}>
+                    <Ionicons name="cart-outline" size={48} color={COLORS.muted} style={{marginBottom: 10}}/>
+                    <Text style={styles.emptyTitle}>Your cart is empty</Text>
+                    <Text style={styles.emptyText}>
+                        Add items from the marketplace to get started.
+                    </Text>
+                    <TouchableOpacity
+                        style={styles.primaryButton}
+                        onPress={() => navigation?.navigate?.("FarmerProducts")}
+                    >
+                        <Text style={styles.primaryButtonText}>Browse Products</Text>
+                    </TouchableOpacity>
+                </View>
+            ) : (
+                <>
+                    <FlatList
+                        data={cartItems}
+                        keyExtractor={(item) => item.cartItemId}
+                        contentContainerStyle={{ paddingBottom: 16 }}
+                        renderItem={({ item }) => (
+                            <View style={styles.card}>
+                                <View style={styles.cardContent}>
+                                    <View style={styles.imageWrapper}>
+                                        {item.images?.[0] ? (
+                                            <Image source={{ uri: item.images[0] }} style={styles.image} />
+                                        ) : (
+                                            <View style={styles.imagePlaceholder}>
+                                                <Feather name="image" size={24} color={COLORS.muted} />
+                                            </View>
+                                        )}
+                                    </View>
+                                    <View style={styles.detailsColumn}>
+                                        <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
+                                        <Text style={styles.productMeta}>
+                                            {item.category} | {item.unit} | Seller: {item.seller?.uploaderName || "Unknown"}
+                                        </Text>
+                                        <Text style={styles.priceText}>
+                                            Unit Price: Rs. {(item.price || 0).toLocaleString()}
+                                        </Text>
+                                        <Text style={styles.subtotalText}>
+                                            Subtotal: Rs. {((item.price || 0) * (item.quantity || 0)).toLocaleString()}
+                                        </Text>
+                                    </View>
+                                </View>
+
+                                <View style={styles.actionsRow}>
+                                    <View style={styles.quantityControl}>
+                                        <TouchableOpacity
+                                            onPress={() => updateQuantity(item.productId, item.quantity - 1)}
+                                            style={[styles.quantityButton, { borderRightWidth: 1 }]}
+                                        >
+                                            <Text style={styles.quantityButtonText}>-</Text>
+                                        </TouchableOpacity>
+                                        <Text style={styles.quantityValue}>{item.quantity}</Text>
+                                        <TouchableOpacity
+                                            onPress={() => updateQuantity(item.productId, item.quantity + 1)}
+                                            style={[styles.quantityButton, { borderLeftWidth: 1 }]}
+                                        >
+                                            <Text style={styles.quantityButtonText}>+</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                    <TouchableOpacity
+                                        style={styles.removeButton}
+                                        onPress={() => removeItem(item.productId)}
+                                    >
+                                        <Feather name="trash-2" size={16} color={COLORS.surface} />
+                                        <Text style={styles.removeButtonText}>Remove</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        )}
+                    />
+
+                    {/* Summary and Checkout Toggle */}
+                    <View style={styles.summaryCard}>
+                        <View style={styles.summaryRow}>
+                            <Text style={styles.summaryLabel}>Cart Total</Text>
+                            <Text style={styles.summaryValue}>Rs. {total.toLocaleString()}</Text>
+                        </View>
+                        <TouchableOpacity
+                            style={styles.primaryButton}
+                            onPress={() => setCheckoutVisible((prev) => !prev)}
+                        >
+                            <Text style={styles.primaryButtonText}>
+                                {checkoutVisible ? "Hide Checkout Form" : "Proceed to Checkout"}
+                            </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.secondaryButton}
+                            onPress={() => navigation?.navigate?.("FarmerProducts")}
+                        >
+                            <Text style={styles.secondaryButtonText}>Continue Shopping</Text>
+                        </TouchableOpacity>
+                    </View>
+                </>
+            )}
+
+            {/* Checkout Form Scrollable Overlay */}
+            {checkoutVisible && cartItems.length > 0 && (
+                <ScrollView style={styles.checkoutCard}>
+                    <Text style={styles.checkoutTitle}>Delivery & Payment</Text>
+
+                    <View style={styles.formSection}>
+                        <Text style={styles.sectionTitle}>Delivery Details</Text>
+                        <View style={styles.formGroup}>
+                            <Text style={styles.label}>Full Name *</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholderTextColor={COLORS.muted}
+                                placeholder="Enter full name"
+                                value={checkoutForm.fullName}
+                                onChangeText={(t) => handleCheckoutChange("fullName", t)}
+                            />
+                        </View>
+                        <View style={styles.formGroup}>
+                            <Text style={styles.label}>Phone Number *</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholderTextColor={COLORS.muted}
+                                placeholder="Enter phone number"
+                                value={checkoutForm.phoneNumber}
+                                onChangeText={(t) => handleCheckoutChange("phoneNumber", t)}
+                                keyboardType="phone-pad"
+                            />
+                        </View>
+                        <View style={styles.formGroup}>
+                            <Text style={styles.label}>Street/Area *</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholderTextColor={COLORS.muted}
+                                placeholder="e.g., House No. 123, Lane 4"
+                                value={checkoutForm.street}
+                                onChangeText={(t) => handleCheckoutChange("street", t)}
+                            />
+                        </View>
+                        <View style={styles.formRow}>
+                            <View style={{ flex: 1, marginRight: 8 }}>
+                                <Text style={styles.label}>City *</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholderTextColor={COLORS.muted}
+                                    value={checkoutForm.city}
+                                    onChangeText={(t) => handleCheckoutChange("city", t)}
+                                />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.label}>Zip code</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholderTextColor={COLORS.muted}
+                                    value={checkoutForm.zipCode}
+                                    onChangeText={(t) => handleCheckoutChange("zipCode", t)}
+                                    keyboardType="numeric"
+                                />
+                            </View>
+                        </View>
+                        <View style={styles.formGroup}>
+                            <Text style={styles.label}>Notes (Optional)</Text>
+                            <TextInput
+                                style={[styles.input, { height: 70, textAlignVertical: "top" }]}
+                                multiline
+                                placeholderTextColor={COLORS.muted}
+                                placeholder="e.g., Leave order with guard."
+                                value={checkoutForm.notes}
+                                onChangeText={(t) => handleCheckoutChange("notes", t)}
+                            />
+                        </View>
+                    </View>
+
+                    <View style={styles.formSection}>
+                         <Text style={styles.sectionTitle}>Payment Method</Text>
+                        <View style={styles.paymentRow}>
+                            {PAYMENT_METHODS.map((method) => (
+                                <TouchableOpacity
+                                    key={method.key}
+                                    style={[
+                                        styles.paymentChip,
+                                        checkoutForm.paymentMethod === method.key && styles.paymentChipActive
+                                    ]}
+                                    onPress={() => handleCheckoutChange("paymentMethod", method.key)}
+                                >
+                                    <Text
+                                        style={[
+                                            styles.paymentChipText,
+                                            checkoutForm.paymentMethod === method.key && styles.paymentChipTextActive
+                                        ]}
+                                    >
+                                        {method.name}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                    </View>
+                   
+                    <TouchableOpacity style={[styles.primaryButton, {marginTop: 20}]} onPress={placeOrder}>
+                        <Text style={styles.primaryButtonText}>Confirm Order (Rs. {total.toLocaleString()})</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.cancelCheckoutButton} onPress={() => setCheckoutVisible(false)}>
+                        <Text style={styles.cancelCheckoutText}>Cancel Checkout</Text>
+                    </TouchableOpacity>
+                </ScrollView>
+            )}
+        </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+  // --- General Layout ---
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    // IMPROVEMENT: Soft green background
+    backgroundColor: '#F0FFF0',
     paddingHorizontal: 16,
     paddingTop: 16
   },
@@ -388,51 +451,73 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 12
+    marginBottom: 16,
   },
   heading: {
-    fontSize: 22,
-    fontWeight: "700",
+    fontSize: 26,
+    fontWeight: "800",
     color: COLORS.primaryDark
   },
   clearButton: {
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 8,
     borderRadius: RADIUS.pill,
     borderWidth: 1,
-    borderColor: COLORS.danger
+    borderColor: COLORS.danger,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
   },
   clearButtonText: {
     color: COLORS.danger,
-    fontWeight: "600"
+    fontWeight: "700",
+    fontSize: 14,
   },
+  // --- Action Messages ---
   actionMessage: {
-    fontSize: 13,
-    color: COLORS.success,
-    backgroundColor: "#dcfce7",
+    fontSize: 14,
+    fontWeight: "700",
     padding: 10,
     borderRadius: RADIUS.md,
-    marginBottom: 12,
-    textAlign: "center"
+    marginBottom: 16,
+    textAlign: "center",
+    borderLeftWidth: 5,
   },
+  actionMessageSuccess: {
+      color: COLORS.success,
+      backgroundColor: COLORS.accent,
+      borderColor: COLORS.success,
+  },
+  actionMessageDanger: {
+      color: COLORS.danger,
+      backgroundColor: COLORS.danger,
+      borderColor: COLORS.danger,
+      opacity: 0.8,
+  },
+  // --- Item Card ---
   card: {
     backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.md,
-    padding: 14,
-    marginBottom: 12,
-    ...SHADOWS.card
+    borderRadius: RADIUS.lg,
+    padding: 16,
+    marginBottom: 15,
+    ...SHADOWS.card,
+    borderLeftWidth: 5,
+    borderColor: COLORS.primaryLight,
   },
-  cardRow: {
+  cardContent: {
     flexDirection: "row",
-    alignItems: "center"
+    alignItems: "center",
+    marginBottom: 15,
   },
   imageWrapper: {
-    width: 70,
-    height: 70,
-    borderRadius: RADIUS.sm,
+    width: 80,
+    height: 80,
+    borderRadius: RADIUS.md,
     backgroundColor: COLORS.background,
     overflow: "hidden",
-    marginRight: 12
+    marginRight: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   image: {
     width: "100%",
@@ -444,32 +529,39 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center"
   },
-  imagePlaceholderText: {
-    fontSize: 10,
-    color: COLORS.muted
+  detailsColumn: {
+      flex: 1,
   },
   productName: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: COLORS.mutedDark
+    fontSize: 16,
+    fontWeight: "700",
+    color: COLORS.primaryDark,
+    marginBottom: 4,
   },
   productMeta: {
     fontSize: 12,
     color: COLORS.muted,
-    marginTop: 2
+    marginBottom: 2,
   },
   priceText: {
     marginTop: 6,
-    fontSize: 15,
-    fontWeight: "700",
-    color: COLORS.primary
+    fontSize: 14,
+    fontWeight: "600",
+    color: COLORS.mutedDark,
   },
+  subtotalText: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: COLORS.primary,
+      marginTop: 4,
+  },
+  // --- Quantity/Remove Actions ---
   actionsRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginTop: 15,
-    paddingTop: 12,
+    paddingTop: 15,
     borderTopWidth: 1,
     borderTopColor: COLORS.border
   },
@@ -483,37 +575,39 @@ const styles = StyleSheet.create({
   },
   quantityButton: {
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: COLORS.background
+    paddingVertical: 8,
+    backgroundColor: COLORS.surface
   },
   quantityButtonText: {
     fontSize: 16,
-    fontWeight: "600",
-    color: COLORS.mutedDark
+    fontWeight: "700",
+    color: COLORS.primaryDark
   },
   quantityValue: {
     paddingHorizontal: 14,
     fontSize: 15,
-    fontWeight: "600",
-    color: COLORS.primaryDark
+    fontWeight: "700",
+    color: COLORS.primary
   },
   removeButton: {
     paddingHorizontal: 14,
-    paddingVertical: 7,
+    paddingVertical: 8,
     borderRadius: RADIUS.pill,
     backgroundColor: COLORS.danger,
     flexDirection: "row",
-    alignItems: "center"
+    alignItems: "center",
+    gap: 5,
   },
   removeButtonText: {
     color: COLORS.surface,
-    fontWeight: "600",
-    fontSize: 13
+    fontWeight: "700",
+    fontSize: 14
   },
+  // --- Summary Card ---
   summaryCard: {
     backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.md,
-    padding: 16,
+    borderRadius: RADIUS.lg,
+    padding: 20,
     marginTop: 10,
     marginBottom: 16,
     ...SHADOWS.card
@@ -523,100 +617,120 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 15,
-    paddingBottom: 10,
+    paddingBottom: 15,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border
   },
   summaryLabel: {
-    fontSize: 16,
+    fontSize: 18,
     color: COLORS.mutedDark,
     fontWeight: "700"
   },
   summaryValue: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: COLORS.primary
+    fontSize: 24,
+    fontWeight: "800",
+    color: COLORS.primaryDark,
   },
+  // --- Primary/Secondary Buttons ---
   primaryButton: {
     backgroundColor: COLORS.primary,
     borderRadius: RADIUS.pill,
-    paddingVertical: 14,
+    paddingVertical: 16,
     alignItems: "center",
-    marginBottom: 10
+    marginBottom: 10,
+    ...SHADOWS.soft,
+    shadowColor: COLORS.primary,
   },
   primaryButtonText: {
     color: COLORS.surface,
-    fontSize: 16,
-    fontWeight: "700"
+    fontSize: 17,
+    fontWeight: "800"
   },
   secondaryButton: {
     borderRadius: RADIUS.pill,
-    paddingVertical: 14,
+    paddingVertical: 16,
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    borderWidth: 2,
+    borderColor: COLORS.primary,
     backgroundColor: COLORS.surface
   },
   secondaryButtonText: {
-    color: COLORS.mutedDark,
-    fontSize: 15,
-    fontWeight: "600"
+    color: COLORS.primary,
+    fontSize: 16,
+    fontWeight: "700"
   },
+  // --- Checkout Form Card ---
   checkoutCard: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    maxHeight: '85%',
     backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.lg,
-    padding: 18,
-    marginBottom: 20,
-    ...SHADOWS.card
+    borderTopLeftRadius: RADIUS.lg,
+    borderTopRightRadius: RADIUS.lg,
+    padding: 25,
+    ...SHADOWS.card,
+    elevation: 20,
   },
   checkoutTitle: {
-    fontSize: 20,
-    fontWeight: "700",
+    fontSize: 22,
+    fontWeight: "800",
     color: COLORS.primaryDark,
-    marginBottom: 15,
+    marginBottom: 20,
     textAlign: "center"
   },
+  formSection: {
+      marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: COLORS.primaryDark,
+    marginBottom: 12,
+  },
   formGroup: {
-    marginBottom: 12
+    marginBottom: 15
   },
   formRow: {
     flexDirection: "row",
-    marginBottom: 12,
+    marginBottom: 15,
     gap: 10
   },
   label: {
     fontSize: 14,
     color: COLORS.mutedDark,
     marginBottom: 6,
-    fontWeight: "600"
+    fontWeight: "700"
   },
   input: {
     borderWidth: 1,
     borderColor: COLORS.border,
     borderRadius: RADIUS.md,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 10,
     backgroundColor: COLORS.background,
     fontSize: 14,
     color: COLORS.mutedDark
   },
+  // --- Payment Chips ---
   paymentRow: {
     flexDirection: "row",
     flexWrap: "wrap",
     marginBottom: 15,
-    gap: 8
+    gap: 10
   },
   paymentChip: {
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: RADIUS.pill,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: COLORS.border,
     backgroundColor: COLORS.background
   },
   paymentChipActive: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary
+    backgroundColor: COLORS.accent,
+    borderColor: COLORS.primary,
   },
   paymentChipText: {
     color: COLORS.mutedDark,
@@ -624,8 +738,9 @@ const styles = StyleSheet.create({
     fontSize: 13
   },
   paymentChipTextActive: {
-    color: COLORS.surface
+    color: COLORS.primaryDark
   },
+  // --- Empty State ---
   emptyState: {
     flex: 1,
     alignItems: "center",
@@ -634,11 +749,13 @@ const styles = StyleSheet.create({
     paddingVertical: 40,
     backgroundColor: COLORS.surface,
     borderRadius: RADIUS.lg,
-    ...SHADOWS.soft
+    ...SHADOWS.soft,
+    marginHorizontal: 16,
+    marginTop: 20,
   },
   emptyTitle: {
     fontSize: 20,
-    fontWeight: "700",
+    fontWeight: "800",
     color: COLORS.primaryDark,
     marginBottom: 10
   },
@@ -648,11 +765,22 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: 20
   },
+  cancelCheckoutButton: {
+      marginTop: 10,
+      alignItems: 'center',
+  },
+  cancelCheckoutText: {
+      color: COLORS.muted,
+      fontSize: 14,
+      fontWeight: '600',
+      textDecorationLine: 'underline',
+  },
+  // --- Utility ---
   centered: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: COLORS.background,
+    backgroundColor: '#F0FFF0',
     padding: 24
   },
   loadingText: {
@@ -680,9 +808,7 @@ const styles = StyleSheet.create({
   },
   retryText: {
     color: COLORS.surface,
-    fontWeight: "600",
+    fontWeight: "700",
     fontSize: 15
   }
 });
-
-

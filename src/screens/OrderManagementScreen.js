@@ -6,17 +6,33 @@ import {
   ActivityIndicator,
   TextInput,
   FlatList,
-  TouchableOpacity
+  TouchableOpacity,
+  ScrollView,
 } from "react-native";
 import { apiClient } from "../api/client";
 import { COLORS, SHADOWS, RADIUS } from "../styles/theme";
-
-// Mobile version of OrderManagement.jsx
-// APIs:
-//  GET /api/v1/order/supplier-orders
-//  PUT /api/v1/order/update-status/:id
+import { Feather, Ionicons } from "@expo/vector-icons"; // Added for icons
 
 const STATUSES = ["all", "pending", "processing", "shipped", "delivered", "canceled"];
+
+// Utility function to get status colors dynamically
+const getStatusStyles = (status) => {
+  const s = status?.toLowerCase();
+  switch (s) {
+    case "delivered":
+      return { backgroundColor: COLORS.success, color: COLORS.surface };
+    case "shipped":
+      return { backgroundColor: COLORS.info, color: COLORS.surface };
+    case "processing":
+      return { backgroundColor: COLORS.warning, color: COLORS.primaryDark };
+    case "pending":
+      return { backgroundColor: COLORS.accent, color: COLORS.primaryDark };
+    case "canceled":
+      return { backgroundColor: COLORS.danger, color: COLORS.surface };
+    default:
+      return { backgroundColor: COLORS.muted, color: COLORS.surface };
+  }
+};
 
 export default function OrderManagementScreen() {
   const [orders, setOrders] = useState([]);
@@ -74,7 +90,7 @@ export default function OrderManagementScreen() {
         { status: newStatus },
         { withCredentials: true }
       );
-      setActionMessage("Order status updated");
+      setActionMessage(`Status updated to ${newStatus.toUpperCase()}`);
       setOrders((prev) =>
         prev.map((o) =>
           o._id === orderId ? { ...o, status: newStatus } : o
@@ -90,7 +106,7 @@ export default function OrderManagementScreen() {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#16a34a" />
+        <ActivityIndicator size="large" color={COLORS.primary} />
         <Text style={styles.loadingText}>Loading orders...</Text>
       </View>
     );
@@ -108,110 +124,138 @@ export default function OrderManagementScreen() {
     );
   }
 
+  const renderOrderCard = ({ item }) => {
+    const orderStatusStyles = getStatusStyles(item.status);
+    const nextStatus = item.status === 'pending' ? 'processing' : 
+                       item.status === 'processing' ? 'shipped' : 
+                       item.status === 'shipped' ? 'delivered' : null;
+
+    return (
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <View>
+            <Text style={styles.orderId}>
+              Order #<Text style={{ color: COLORS.primaryDark }}>{item._id?.slice(-6).toUpperCase()}</Text>
+            </Text>
+            <View style={styles.dateRow}>
+              <Feather name="calendar" size={12} color={COLORS.muted} />
+              <Text style={styles.dateText}>
+                {new Date(item.createdAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}
+              </Text>
+            </View>
+          </View>
+          <Text style={styles.amountText}>
+            Rs. {Number(item.totalPrice || 0).toLocaleString()}
+          </Text>
+        </View>
+
+        <View style={styles.divider} />
+
+        <Text style={styles.productsText}>
+          <Feather name="package" size={14} color={COLORS.mutedDark} />
+          {item.products?.length || 0} items • {item.products?.[0]?.name || "N/A"}
+        </Text>
+
+        <View style={styles.statusRowCard}>
+          <View style={[styles.statusBadge, { backgroundColor: orderStatusStyles.backgroundColor }]}>
+            <Text style={[styles.statusBadgeText, { color: orderStatusStyles.color }]}>
+              {item.status?.toUpperCase()}
+            </Text>
+          </View>
+          <Text style={styles.paymentBadge(item.paymentInfo?.status)}>
+            {item.paymentInfo?.status || "Cash"}
+          </Text>
+        </View>
+
+        <View style={styles.addressRow}>
+          <Feather name="map-pin" size={14} color={COLORS.muted} />
+          <Text style={styles.addressText}>
+            {item.shippingAddress?.street || "Street"}, {item.shippingAddress?.city || "City"}
+          </Text>
+        </View>
+
+        {/* Status Update Actions */}
+        <View style={styles.statusSelector}>
+          {nextStatus ? (
+            <TouchableOpacity
+              style={styles.nextStatusButton}
+              onPress={() => updateStatus(item._id, nextStatus)}
+            >
+              <Text style={styles.nextStatusText}>
+                Mark as {nextStatus.toUpperCase()}
+              </Text>
+              <Feather name="chevron-right" size={16} color={COLORS.surface} />
+            </TouchableOpacity>
+          ) : null}
+
+          {/* View Details/Order History Button */}
+          <TouchableOpacity
+             style={styles.detailsButton}
+             onPress={() => console.log("Navigate to Order Detail", item._id)}
+          >
+             <Text style={styles.detailsText}>View Details</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.heading}>Order Management</Text>
 
       <TextInput
         style={styles.searchInput}
-        placeholder="Search by order ID, product, city..."
+        placeholder="Search by ID, product, city..."
+        placeholderTextColor={COLORS.muted}
         value={searchTerm}
         onChangeText={setSearchTerm}
       />
 
-      <View style={styles.statusRow}>
-        {STATUSES.map((s) => (
-          <TouchableOpacity
-            key={s}
-            style={[
-              styles.statusChip,
-              statusFilter === s && styles.statusChipActive
-            ]}
-            onPress={() => setStatusFilter(s)}
-          >
-            <Text
+      {/* Status Filter Chips */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.statusRowScroll}>
+        <View style={styles.statusRow}>
+          {STATUSES.map((s) => (
+            <TouchableOpacity
+              key={s}
               style={[
-                styles.statusText,
-                statusFilter === s && styles.statusTextActive
+                styles.statusChip,
+                statusFilter === s && styles.statusChipActive,
+                // Apply active status color if active
+                statusFilter === s && { backgroundColor: getStatusStyles(s).backgroundColor, borderColor: getStatusStyles(s).backgroundColor }
               ]}
+              onPress={() => setStatusFilter(s)}
             >
-              {s === "all" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+              <Text
+                style={[
+                  styles.statusText,
+                  statusFilter === s && styles.statusTextActive,
+                  // Apply text color based on chip background (only if active)
+                  statusFilter === s && { color: getStatusStyles(s).color }
+                ]}
+              >
+                {s === "all" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </ScrollView>
 
       {actionMessage ? (
-        <Text style={styles.actionMessage}>{actionMessage}</Text>
+        <Text style={[styles.actionMessage, actionMessage.includes("Failed") ? { color: COLORS.danger } : { color: COLORS.success }]}>
+          {actionMessage}
+        </Text>
       ) : null}
 
       <FlatList
         data={filteredOrders}
         keyExtractor={(item) => item._id}
         contentContainerStyle={{ paddingBottom: 24 }}
-        renderItem={({ item }) => (
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <View>
-                <Text style={styles.orderId}>
-                  Order #{item._id?.slice(-6).toUpperCase()}
-                </Text>
-                <Text style={styles.dateText}>
-                  {new Date(item.createdAt).toLocaleString()}
-                </Text>
-              </View>
-              <Text style={styles.amountText}>
-                Rs. {Number(item.totalPrice || 0).toLocaleString()}
-              </Text>
-            </View>
-
-            <Text style={styles.productsText}>
-              {item.products?.length || 0} items •{" "}
-              {item.products?.[0]?.name || "N/A"}
-            </Text>
-
-            <View style={styles.statusRowCard}>
-              <View style={styles.statusBadge}>
-                <Text style={styles.statusBadgeText}>
-                  {item.status?.toUpperCase()}
-                </Text>
-              </View>
-              <Text style={styles.paymentBadge(item.paymentInfo?.status)}>
-                {item.paymentInfo?.status}
-              </Text>
-            </View>
-
-            <Text style={styles.addressText}>
-              {item.shippingAddress?.street || "Street"},{" "}
-              {item.shippingAddress?.city || "City"}
-            </Text>
-
-            <View style={styles.statusSelector}>
-              {STATUSES.filter((s) => s !== "all").map((status) => (
-                <TouchableOpacity
-                  key={status}
-                  style={[
-                    styles.statusOption,
-                    item.status === status && styles.statusOptionActive
-                  ]}
-                  onPress={() => updateStatus(item._id, status)}
-                >
-                  <Text
-                    style={[
-                      styles.statusOptionText,
-                      item.status === status && styles.statusOptionTextActive
-                    ]}
-                  >
-                    {status}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        )}
+        renderItem={renderOrderCard}
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Text style={styles.emptyTitle}>No orders found</Text>
+            <Ionicons name="cart-outline" size={30} color={COLORS.muted} style={{marginBottom: 10}}/>
+            <Text style={styles.emptyTitle}>No orders match the filter</Text>
             <Text style={styles.emptyText}>
               Adjust filters or search to see results.
             </Text>
@@ -225,154 +269,207 @@ export default function OrderManagementScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    // IMPROVEMENT: Soft green background
+    backgroundColor: '#F0FFF0',
     paddingHorizontal: 16,
-    paddingTop: 16
+    paddingTop: 16,
   },
   heading: {
-    fontSize: 22,
-    fontWeight: "700",
+    fontSize: 26,
+    fontWeight: "800",
     color: COLORS.primaryDark,
-    marginBottom: 12
+    marginBottom: 16,
   },
   searchInput: {
     backgroundColor: COLORS.surface,
     borderRadius: RADIUS.pill,
     borderWidth: 1,
     borderColor: COLORS.border,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    fontSize: 14,
-    marginBottom: 10
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    fontSize: 15,
+    marginBottom: 16,
+    color: COLORS.mutedDark,
+  },
+  // --- Status Filter Chips ---
+  statusRowScroll: {
+    maxHeight: 45, // Prevent scroll view from stretching indefinitely
+    marginBottom: 15,
   },
   statusRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    marginBottom: 10
+    flexWrap: "nowrap",
+    marginBottom: 6,
+    paddingHorizontal: 2,
+    alignItems: 'center',
   },
   statusChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
     borderRadius: RADIUS.pill,
-    backgroundColor: "#e5e7eb",
+    backgroundColor: COLORS.border,
     marginRight: 8,
-    marginBottom: 6
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    flexShrink: 1,
   },
   statusChipActive: {
-    backgroundColor: COLORS.primary
+    // Styles handled by getStatusStyles and applied inline for dynamic colors
   },
   statusText: {
-    fontSize: 12,
+    fontSize: 13,
     color: COLORS.mutedDark,
-    fontWeight: "600"
+    fontWeight: "600",
   },
   statusTextActive: {
-    color: "#ffffff"
+    // Styles handled by getStatusStyles and applied inline for dynamic colors
   },
   actionMessage: {
-    fontSize: 12,
-    color: COLORS.primary,
-    marginBottom: 8
+    fontSize: 14,
+    fontWeight: "600",
+    marginBottom: 12,
+    textAlign: 'center',
+    padding: 8,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.md,
   },
+  // --- Order Card ---
   card: {
     backgroundColor: COLORS.surface,
     borderRadius: RADIUS.lg,
-    padding: 14,
-    marginBottom: 12,
-    ...SHADOWS.card
+    padding: 16,
+    marginBottom: 16,
+    ...SHADOWS.soft,
+    borderLeftWidth: 5,
+    borderColor: COLORS.primary, // Themed border
   },
   cardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 6
+    marginBottom: 8,
+    alignItems: 'center',
   },
   orderId: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: COLORS.mutedDark
+    fontSize: 17,
+    fontWeight: "700",
+    color: COLORS.mutedDark,
+    marginBottom: 4,
+  },
+  dateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
   },
   dateText: {
     fontSize: 12,
-    color: COLORS.muted
+    color: COLORS.muted,
   },
   amountText: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: COLORS.primaryDark
+    fontSize: 20,
+    fontWeight: "800",
+    color: COLORS.primaryDark,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: COLORS.border,
+    marginVertical: 10,
   },
   productsText: {
-    fontSize: 13,
-    color: COLORS.muted,
-    marginBottom: 6
+    fontSize: 14,
+    color: COLORS.mutedDark,
+    marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   statusRowCard: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 6
+    marginBottom: 10,
   },
   statusBadge: {
     paddingHorizontal: 10,
-    paddingVertical: 4,
-    backgroundColor: "#dcfce7",
+    paddingVertical: 5,
     borderRadius: RADIUS.pill,
-    marginRight: 8
+    marginRight: 10,
+    minWidth: 90,
+    alignItems: 'center',
   },
   statusBadgeText: {
-    color: COLORS.primaryDark,
-    fontSize: 11,
-    fontWeight: "700"
+    fontSize: 12,
+    fontWeight: "800",
   },
   paymentBadge: (status) => ({
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: 5,
     borderRadius: RADIUS.pill,
-    backgroundColor: status === "completed" ? "#d1fae5" : "#fef3c7",
-    color: status === "completed" ? "#047857" : "#b45309",
-    fontSize: 11,
-    fontWeight: "700"
-  }),
-  addressText: {
+    backgroundColor: status === "paid" ? COLORS.accent : COLORS.warning,
+    color: status === "paid" ? COLORS.primaryDark : COLORS.surface,
     fontSize: 12,
-    color: COLORS.muted,
-    marginBottom: 8
+    fontWeight: "800",
+    // Ensure the return value is an object
+    // Note: If the backend returns 'completed' for status, adjust logic above.
+  }),
+  addressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 15,
   },
+  addressText: {
+    fontSize: 13,
+    color: COLORS.muted,
+  },
+  // --- Status Update Actions ---
   statusSelector: {
     flexDirection: "row",
-    flexWrap: "wrap"
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    paddingTop: 10,
   },
-  statusOption: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+  nextStatusButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.primaryDark,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: RADIUS.pill,
+    gap: 5,
+    ...SHADOWS.soft,
+  },
+  nextStatusText: {
+    color: COLORS.surface,
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  detailsButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     borderRadius: RADIUS.pill,
     borderWidth: 1,
-    borderColor: COLORS.border,
-    marginRight: 6,
-    marginBottom: 6
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.surface,
   },
-  statusOptionActive: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary
+  detailsText: {
+    color: COLORS.primary,
+    fontWeight: '700',
+    fontSize: 14,
   },
-  statusOptionText: {
-    fontSize: 12,
-    color: COLORS.mutedDark,
-    fontWeight: "600"
-  },
-  statusOptionTextActive: {
-    color: "#ffffff"
-  },
+  // --- Utility Styles ---
   emptyState: {
     paddingVertical: 40,
     alignItems: "center"
   },
   emptyTitle: {
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: 18,
+    fontWeight: "700",
     color: COLORS.mutedDark,
     marginBottom: 4
   },
   emptyText: {
-    fontSize: 13,
+    fontSize: 14,
     color: COLORS.muted,
     textAlign: "center"
   },
@@ -380,11 +477,12 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    padding: 24
+    padding: 24,
+    backgroundColor: '#F0FFF0',
   },
   loadingText: {
     marginTop: 8,
-    color: COLORS.muted
+    color: COLORS.mutedDark
   },
   errorTitle: {
     fontSize: 18,
@@ -394,7 +492,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 14,
-    color: COLORS.muted,
+    color: COLORS.mutedDark,
     textAlign: "center",
     marginBottom: 10
   },
@@ -405,9 +503,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary
   },
   retryText: {
-    color: "#ffffff",
+    color: COLORS.surface,
     fontWeight: "600"
   }
 });
-
-

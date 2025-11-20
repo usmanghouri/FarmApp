@@ -14,16 +14,10 @@ import {
 import * as ImagePicker from "expo-image-picker";
 import { apiClient } from "../api/client";
 import { COLORS, SHADOWS, RADIUS } from "../styles/theme";
+import { Feather } from "@expo/vector-icons"; // Added for icons
 
 const CLOUDINARY_UPLOAD_PRESET = "FarmConnect";
 const CLOUDINARY_CLOUD_NAME = "dn5edjpzg";
-
-// Mobile counterpart of ProductManagement.jsx
-// Endpoints used:
-//  GET  /api/products/my_product
-//  POST /api/products/add
-//  PUT  /api/products/update/:id
-//  DELETE /api/products/delete/:id
 
 const CATEGORY_OPTIONS = [
   "Fruits",
@@ -177,14 +171,14 @@ export default function ProductManagementScreen() {
           payload,
           { withCredentials: true }
         );
-        setActionMessage("Product updated");
+        setActionMessage("Product updated successfully!");
       } else {
         await apiClient.post(
           "/api/products/add",
           payload,
           { withCredentials: true }
         );
-        setActionMessage("Product added");
+        setActionMessage("Product added successfully!");
       }
       await fetchProducts();
       resetForm();
@@ -211,25 +205,38 @@ export default function ProductManagementScreen() {
   };
 
   const deleteProduct = async (productId) => {
-    try {
-      setActionMessage("");
-      await apiClient.delete(
-        `/api/products/delete/${productId}`,
-        { withCredentials: true }
-      );
-      setActionMessage("Product deleted");
-      fetchProducts();
-    } catch (err) {
-      const msg =
-        err?.response?.data?.message || err.message || "Failed to delete product";
-      setActionMessage(msg);
-    }
+    Alert.alert(
+      "Confirm Deletion",
+      "Are you sure you want to delete this product listing?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Delete", 
+          style: "destructive", 
+          onPress: async () => {
+            try {
+              setActionMessage("");
+              await apiClient.delete(
+                `/api/products/delete/${productId}`,
+                { withCredentials: true }
+              );
+              setActionMessage("Product deleted successfully!");
+              fetchProducts();
+            } catch (err) {
+              const msg =
+                err?.response?.data?.message || err.message || "Failed to delete product";
+              setActionMessage(msg);
+            }
+          }
+        },
+      ]
+    );
   };
 
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#16a34a" />
+        <ActivityIndicator size="large" color={COLORS.primary} />
         <Text style={styles.loadingText}>Loading your products...</Text>
       </View>
     );
@@ -250,7 +257,7 @@ export default function ProductManagementScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.headerRow}>
-        <Text style={styles.heading}>My Products</Text>
+        <Text style={styles.heading}>My Products ({products.length})</Text>
         <TouchableOpacity
           style={styles.addButton}
           onPress={() => {
@@ -260,36 +267,45 @@ export default function ProductManagementScreen() {
               setIsFormVisible(true);
               setEditingProduct(null);
               setForm(emptyForm);
+              setImagePreview(null);
             }
           }}
         >
+          <Feather name={isFormVisible && !editingProduct ? "x" : "plus"} size={18} color={COLORS.surface} />
           <Text style={styles.addButtonText}>
-            {isFormVisible && !editingProduct ? "Close Form" : "Add Product"}
+            {isFormVisible && !editingProduct ? "Close" : "Add Product"}
           </Text>
         </TouchableOpacity>
       </View>
 
       <TextInput
         placeholder="Search by name, description, category..."
+        placeholderTextColor={COLORS.muted}
         value={searchTerm}
         onChangeText={setSearchTerm}
         style={styles.searchInput}
       />
 
       {actionMessage ? (
-        <Text style={styles.actionMessage}>{actionMessage}</Text>
+        <Text style={[styles.actionMessage, actionMessage.includes("Error") || actionMessage.includes("Failed") ? {color: COLORS.danger} : {color: COLORS.success}]}>
+          {actionMessage}
+        </Text>
       ) : null}
 
       {isFormVisible && (
         <ScrollView style={styles.formCard}>
           <Text style={styles.formTitle}>
-            {editingProduct ? "Edit Product" : "Add New Product"}
+            {editingProduct ? "Edit Product Details" : "Add New Product"}
           </Text>
 
+          {/* Form Fields */}
+          
           <View style={styles.formRow}>
             <Text style={styles.label}>Product Name *</Text>
             <TextInput
               style={styles.input}
+              placeholder="e.g., Organic Tomatoes"
+              placeholderTextColor={COLORS.muted}
               value={form.name}
               onChangeText={(t) => handleChange("name", t)}
             />
@@ -297,7 +313,7 @@ export default function ProductManagementScreen() {
 
           <View style={styles.formRow}>
             <Text style={styles.label}>Category</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRowContainer}>
               {CATEGORY_OPTIONS.map((cat) => (
                 <TouchableOpacity
                   key={cat}
@@ -325,6 +341,8 @@ export default function ProductManagementScreen() {
             <TextInput
               style={styles.input}
               keyboardType="numeric"
+              placeholder="e.g., 500"
+              placeholderTextColor={COLORS.muted}
               value={form.price}
               onChangeText={(t) => handleChange("price", t)}
             />
@@ -332,7 +350,7 @@ export default function ProductManagementScreen() {
 
           <View style={styles.formRow}>
             <Text style={styles.label}>Unit</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRowContainer}>
               {UNIT_OPTIONS.map((unit) => (
                 <TouchableOpacity
                   key={unit}
@@ -360,6 +378,8 @@ export default function ProductManagementScreen() {
             <TextInput
               style={styles.input}
               keyboardType="numeric"
+              placeholder="e.g., 100"
+              placeholderTextColor={COLORS.muted}
               value={form.quantity}
               onChangeText={(t) => handleChange("quantity", t)}
             />
@@ -371,6 +391,8 @@ export default function ProductManagementScreen() {
               style={[styles.input, { height: 80, textAlignVertical: "top" }]}
               multiline
               numberOfLines={4}
+              placeholder="Provide a detailed description..."
+              placeholderTextColor={COLORS.muted}
               value={form.description}
               onChangeText={(t) => handleChange("description", t)}
             />
@@ -379,62 +401,70 @@ export default function ProductManagementScreen() {
           <View style={styles.formRow}>
             <Text style={styles.label}>Product Image</Text>
             <TouchableOpacity style={styles.imagePickerButton} onPress={handleImagePick} disabled={loading}>
-              <Text style={styles.imagePickerButtonText}>Pick an image</Text>
+              <Text style={styles.imagePickerButtonText}>
+                {form.imageUrl || imagePreview ? "Change Image" : "Select Image"}
+              </Text>
+              <Feather name="upload-cloud" size={16} color={COLORS.surface} />
             </TouchableOpacity>
-            {imagePreview && (
-              <Image source={{ uri: imagePreview }} style={styles.imagePreview} />
-            )}
-            {form.imageUrl && !imagePreview && ( // Display existing image if no new one picked
-              <Image source={{ uri: form.imageUrl }} style={styles.imagePreview} />
+            {(imagePreview || form.imageUrl) && (
+              <Image source={{ uri: imagePreview || form.imageUrl }} style={styles.imagePreview} />
             )}
           </View>
 
           <View style={styles.formButtons}>
-            <TouchableOpacity style={styles.cancelButton} onPress={resetForm}>
+            <TouchableOpacity style={styles.cancelButton} onPress={resetForm} disabled={loading}>
               <Text style={styles.cancelText}>Cancel</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.saveButton} onPress={handleSubmit}>
+            <TouchableOpacity style={styles.saveButton} onPress={handleSubmit} disabled={loading}>
               <Text style={styles.saveText}>
-                {editingProduct ? "Update" : "Save"}
+                {editingProduct ? "Update Listing" : "Save Product"}
               </Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
       )}
 
+      {/* Product List */}
       <FlatList
         data={filteredProducts}
         keyExtractor={(item) => item._id}
         renderItem={({ item }) => (
           <View style={styles.productCard}>
-            <View style={styles.productHeader}>
-              <Text style={styles.productName}>{item.name}</Text>
-              {item.category ? (
-                <Text style={styles.productCategory}>{item.category}</Text>
-              ) : null}
-            </View>
-            <Text style={styles.productDescription} numberOfLines={2}>
-              {item.description}
-            </Text>
-            <View style={styles.infoRow}>
-              <Text style={styles.price}>
-                Rs. {Number(item.price || 0).toLocaleString()} / {item.unit}
+            {item.images?.[0] && (
+              <Image source={{ uri: item.images[0] }} style={styles.cardImage} />
+            )}
+            <View style={styles.productDetails}>
+              <View style={styles.productHeader}>
+                <Text style={styles.productName}>{item.name}</Text>
+                {item.category ? (
+                  <Text style={styles.productCategory}>{item.category}</Text>
+                ) : null}
+              </View>
+              <Text style={styles.productDescription} numberOfLines={2}>
+                {item.description}
               </Text>
-              <Text style={styles.quantity}>Qty: {item.quantity}</Text>
-            </View>
-            <View style={styles.actionsRow}>
-              <TouchableOpacity
-                style={styles.editButton}
-                onPress={() => startEdit(item)}
-              >
-                <Text style={styles.editText}>Edit</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.deleteButton}
-                onPress={() => deleteProduct(item._id)}
-              >
-                <Text style={styles.deleteText}>Delete</Text>
-              </TouchableOpacity>
+              <View style={styles.infoRow}>
+                <Text style={styles.price}>
+                  Rs. {Number(item.price || 0).toLocaleString()} / {item.unit}
+                </Text>
+                <Text style={styles.quantity}>Qty: {item.quantity}</Text>
+              </View>
+              <View style={styles.actionsRow}>
+                <TouchableOpacity
+                  style={[styles.editButton, { flexDirection: 'row', gap: 6 }]}
+                  onPress={() => startEdit(item)}
+                >
+                  <Feather name="edit" size={14} color={COLORS.primary} />
+                  <Text style={styles.editText}>Edit</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.deleteButton, { flexDirection: 'row', gap: 6 }]}
+                  onPress={() => deleteProduct(item._id)}
+                >
+                  <Feather name="trash-2" size={14} color={COLORS.danger} />
+                  <Text style={styles.deleteText}>Delete</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         )}
@@ -442,7 +472,7 @@ export default function ProductManagementScreen() {
           <View style={styles.emptyState}>
             <Text style={styles.emptyTitle}>No products yet</Text>
             <Text style={styles.emptyText}>
-              Use “Add Product” to create your first listing.
+              Use the "Add Product" button to create your first listing.
             </Text>
           </View>
         }
@@ -452,266 +482,313 @@ export default function ProductManagementScreen() {
 }
 
 const styles = StyleSheet.create({
+  // --- General Container ---
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    // IMPROVEMENT: Soft, branded background color
+    backgroundColor: '#F0FFF0', 
     paddingHorizontal: 16,
     paddingTop: 16
   },
+  // --- Header and Search ---
   headerRow: {
     flexDirection: "row",
-    justifyContent: "space_between",
+    justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 12
+    marginBottom: 16,
   },
   heading: {
-    fontSize: 22,
-    fontWeight: "700",
+    fontSize: 24,
+    fontWeight: "800",
     color: COLORS.primaryDark
   },
   addButton: {
     backgroundColor: COLORS.primary,
     borderRadius: RADIUS.pill,
-    paddingHorizontal: 12,
-    paddingVertical: 8
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    ...SHADOWS.soft,
   },
   addButtonText: {
-    color: "#ffffff",
-    fontWeight: "600",
-    fontSize: 13
+    color: COLORS.surface,
+    fontWeight: "700",
+    fontSize: 14,
   },
   searchInput: {
     backgroundColor: COLORS.surface,
     borderRadius: RADIUS.pill,
     borderWidth: 1,
     borderColor: COLORS.border,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    fontSize: 14,
-    marginBottom: 10
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    fontSize: 15,
+    marginBottom: 16,
+    color: COLORS.mutedDark,
   },
   actionMessage: {
-    color: "#16a34a",
-    fontSize: 12,
-    marginBottom: 8
+    fontSize: 14,
+    fontWeight: "600",
+    marginBottom: 12,
+    textAlign: 'center',
   },
+  // --- Form Card ---
   formCard: {
     backgroundColor: COLORS.surface,
     borderRadius: RADIUS.lg,
-    padding: 14,
-    marginBottom: 16,
-    ...SHADOWS.card
+    padding: 18,
+    marginBottom: 20,
+    ...SHADOWS.card,
+    maxHeight: 450, // Constrain form height
   },
   formTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#111827",
-    marginBottom: 10
+    fontSize: 20,
+    fontWeight: "700",
+    color: COLORS.primaryDark,
+    marginBottom: 15,
   },
   formRow: {
-    marginBottom: 12
+    marginBottom: 16,
   },
   label: {
-    fontSize: 13,
-    color: "#374151",
-    marginBottom: 4,
-    fontWeight: "500"
+    fontSize: 14,
+    color: COLORS.mutedDark,
+    marginBottom: 6,
+    fontWeight: "600"
   },
   input: {
     borderWidth: 1,
     borderColor: COLORS.border,
     borderRadius: RADIUS.md,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 14,
-    backgroundColor: COLORS.surface
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 15,
+    backgroundColor: '#F9F9F9', // Slight contrast background
+    color: COLORS.mutedDark,
+  },
+  // --- Chips (Category/Unit) FIX ---
+  chipRowContainer: {
+    paddingVertical: 4, // Add padding around chips
   },
   chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    // FIX: Optimized padding for tighter, visually balanced chips
+    paddingHorizontal: 12, 
+    paddingVertical: 6, 
     borderRadius: RADIUS.pill,
-    backgroundColor: "#e5e7eb",
-    marginRight: 8
+    backgroundColor: COLORS.border, // Inactive background
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   chipActive: {
-    backgroundColor: "#166534"
+    backgroundColor: COLORS.primary, // Active background
+    borderColor: COLORS.primary,
   },
   chipText: {
-    fontSize: 12,
-    color: "#374151"
+    fontSize: 13,
+    color: COLORS.mutedDark,
+    fontWeight: "600",
   },
   chipTextActive: {
-    color: "#ffffff"
+    color: COLORS.surface, // Active text color
+    fontWeight: "700",
   },
+  // --- Image Picker ---
+  imagePickerButton: {
+    backgroundColor: COLORS.primary,
+    borderRadius: RADIUS.pill,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginTop: 6,
+  },
+  imagePickerButtonText: {
+    color: COLORS.surface,
+    fontWeight: "700",
+    fontSize: 14
+  },
+  imagePreview: {
+    width: "100%",
+    height: 120,
+    borderRadius: RADIUS.md,
+    marginTop: 12,
+  },
+  // --- Form Buttons ---
   formButtons: {
     flexDirection: "row",
     justifyContent: "flex-end",
-    marginTop: 8
+    marginTop: 15,
   },
   cancelButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 999,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: RADIUS.pill,
     borderWidth: 1,
-    borderColor: "#d1d5db",
-    marginRight: 10
+    borderColor: COLORS.border,
+    marginRight: 12,
   },
   cancelText: {
-    color: "#374151",
-    fontWeight: "600"
+    color: COLORS.mutedDark,
+    fontWeight: "700",
+    fontSize: 15,
   },
   saveButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: "#166534"
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: RADIUS.pill,
+    backgroundColor: COLORS.primary,
   },
   saveText: {
-    color: "#ffffff",
-    fontWeight: "600"
+    color: COLORS.surface,
+    fontWeight: "700",
+    fontSize: 15,
   },
+  // --- Product List Card ---
   productCard: {
     backgroundColor: COLORS.surface,
     borderRadius: RADIUS.md,
-    padding: 12,
     marginBottom: 12,
-    ...SHADOWS.card
+    ...SHADOWS.soft,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    gap: 12,
+    borderLeftWidth: 5,
+    borderColor: COLORS.accent,
+  },
+  cardImage: {
+    width: 60,
+    height: 60,
+    borderRadius: RADIUS.sm,
+    resizeMode: 'cover',
+  },
+  productDetails: {
+    flex: 1,
   },
   productHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center"
+    alignItems: "center",
   },
   productName: {
     fontSize: 16,
-    fontWeight: "600",
-    color: "#111827",
+    fontWeight: "700",
+    color: COLORS.primaryDark,
     flex: 1,
-    marginRight: 6
+    marginRight: 8,
   },
   productCategory: {
     fontSize: 11,
-    backgroundColor: "#dcfce7",
-    color: "#166534",
+    backgroundColor: COLORS.accent,
+    color: COLORS.primaryDark,
     paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 999
+    paddingVertical: 3,
+    borderRadius: RADIUS.pill,
+    fontWeight: '600',
   },
   productDescription: {
-    marginTop: 6,
+    marginTop: 4,
     fontSize: 13,
-    color: "#6b7280"
+    color: COLORS.muted,
   },
   infoRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 10
+    marginTop: 8,
   },
   price: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#16a34a"
+    fontSize: 15,
+    fontWeight: "800",
+    color: COLORS.primary,
   },
   quantity: {
-    fontSize: 12,
-    color: "#4b5563"
+    fontSize: 13,
+    color: COLORS.mutedDark,
   },
   actionsRow: {
     flexDirection: "row",
     justifyContent: "flex-end",
-    marginTop: 12
+    marginTop: 10,
+    gap: 8,
   },
   editButton: {
-    marginRight: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
     borderRadius: RADIUS.pill,
     borderWidth: 1,
     borderColor: COLORS.primary
   },
   editText: {
     color: COLORS.primary,
-    fontWeight: "600"
+    fontWeight: "600",
+    fontSize: 13,
   },
   deleteButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
     borderRadius: RADIUS.pill,
-    backgroundColor: "#fee2e2"
+    backgroundColor: COLORS.danger,
+    opacity: 0.5, // Soft background for danger action
+    borderWidth: 1,
+    borderColor: COLORS.danger,
   },
   deleteText: {
-    color: "#b91c1c",
-    fontWeight: "600"
+    color: COLORS.danger,
+    fontWeight: "800",
+    fontSize: 13,
   },
+  // --- Utility Styles ---
   emptyState: {
     paddingVertical: 40,
     alignItems: "center"
   },
   emptyTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#111827",
+    fontSize: 18,
+    fontWeight: "700",
+    color: COLORS.primaryDark,
     marginBottom: 4
   },
   emptyText: {
-    fontSize: 13,
-    color: "#6b7280",
+    fontSize: 14,
+    color: COLORS.muted,
     textAlign: "center"
   },
   centered: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    padding: 24
+    padding: 24,
+    backgroundColor: '#F0FFF0',
   },
   loadingText: {
     marginTop: 8,
-    color: "#4b5563"
+    color: COLORS.mutedDark
   },
   errorTitle: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#b91c1c",
+    color: COLORS.danger,
     marginBottom: 6
   },
   errorText: {
     fontSize: 14,
-    color: "#4b5563",
+    color: COLORS.mutedDark,
     textAlign: "center",
     marginBottom: 12
   },
   retryButton: {
     paddingHorizontal: 18,
     paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: "#166534"
+    borderRadius: RADIUS.pill,
+    backgroundColor: COLORS.primary
   },
   retryText: {
-    color: "#ffffff",
+    color: COLORS.surface,
     fontWeight: "600"
   },
-  imagePickerButton: {
-    backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.pill,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 8,
-    marginBottom: 12
-  },
-  imagePickerButtonText: {
-    color: "#ffffff",
-    fontWeight: "600",
-    fontSize: 13
-  },
-  imagePreview: {
-    width: "100%",
-    height: 150,
-    borderRadius: RADIUS.md,
-    marginTop: 8,
-    marginBottom: 12
-  }
 });
-
-

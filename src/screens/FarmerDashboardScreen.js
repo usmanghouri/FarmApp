@@ -431,8 +431,8 @@ export default function FarmerDashboardScreen({ navigation }) {
         {/* --- Quick Actions Grid (Enhanced) --- */}
         <Text style={styles.sectionTitle}>Quick Actions</Text>
         <View style={styles.actionsGrid}>
-          <ActionTile label="My Products" description="View/Edit stock" onPress={() => navigation.navigate("FarmerProducts")} />
-          <ActionTile label="Manage Products" description="Add new listings" onPress={() => navigation.navigate("ProductManagement")} />
+          <ActionTile label="Manage Products" description="View/Edit stock" onPress={() => navigation.navigate("FarmerProducts")} />
+          <ActionTile label="My Products" description="Add new listings" onPress={() => navigation.navigate("ProductManagement")} />
           <ActionTile label="Orders" description="Pending shipments" onPress={() => navigation.navigate("OrderManagement")} />
           <ActionTile label="My Orders" description="View my history" onPress={() => navigation.navigate("MyOrders")} />
           <ActionTile label="Wishlist" description="Saved supplies" onPress={() => navigation.navigate("Wishlist")} />
