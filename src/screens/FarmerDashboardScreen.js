@@ -381,12 +381,12 @@ export default function FarmerDashboardScreen({ navigation }) {
       {/* --- Custom Header --- */}
       <View style={styles.header}>
         {/* FIX: Menu Button using dispatch */}
-        <TouchableOpacity 
+        {/* <TouchableOpacity 
           onPress={() => navigation.dispatch(DrawerActions.openDrawer())}
           style={styles.menuButton}
         >
           <Ionicons name="menu-outline" size={30} color={COLORS.surface} />
-        </TouchableOpacity>
+        </TouchableOpacity> */}
         
         <Text style={styles.headerTitle}>Farmer Console</Text>
         

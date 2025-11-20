@@ -8,7 +8,7 @@ import {
   TextInput,
   ScrollView,
   Alert,
-  Image
+  Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
@@ -20,13 +20,13 @@ const EMPTY_PROFILE = {
   email: "",
   phone: "",
   address: "",
-  img: ""
+  img: "",
 };
 
 const EMPTY_PASSWORD = {
   oldPassword: "",
   newPassword: "",
-  confirmPassword: ""
+  confirmPassword: "",
 };
 
 export default function FarmerProfileScreen({ navigation }) {
@@ -48,7 +48,7 @@ export default function FarmerProfileScreen({ navigation }) {
         email: user.email || "",
         phone: user.phone || "",
         address: user.address || "",
-        img: user.img || ""
+        img: user.img || "",
       };
       setProfile(mapped);
       setForm(mapped);
@@ -84,7 +84,7 @@ export default function FarmerProfileScreen({ navigation }) {
   const saveProfile = async () => {
     try {
       await apiClient.put("/api/farmers/update", form, { withCredentials: true });
-      showBanner("Profile updated");
+      showBanner("Profile updated successfully!");
       setIsEditing(false);
       fetchProfile();
     } catch (error) {
@@ -94,11 +94,15 @@ export default function FarmerProfileScreen({ navigation }) {
 
   const changePassword = async () => {
     if (!passwordForm.oldPassword || !passwordForm.newPassword || !passwordForm.confirmPassword) {
-      showBanner("Fill all password fields");
+      showBanner("Fill all password fields.");
       return;
     }
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      showBanner("Passwords do not match");
+      showBanner("New passwords do not match.");
+      return;
+    }
+    if (passwordForm.newPassword.length < 6) {
+      showBanner("New password must be at least 6 characters.");
       return;
     }
     try {
@@ -106,31 +110,32 @@ export default function FarmerProfileScreen({ navigation }) {
         "/api/farmers/changepassword",
         {
           oldPassword: passwordForm.oldPassword,
-          newPassword: passwordForm.newPassword
+          newPassword: passwordForm.newPassword,
         },
         { withCredentials: true }
       );
-      showBanner("Password changed");
+      showBanner("Password changed successfully!");
       setPasswordForm(EMPTY_PASSWORD);
       setIsChangingPassword(false);
     } catch (error) {
-      showBanner(error?.response?.data?.message || error.message || "Failed to change password");
+      showBanner(error?.response?.data?.message || error.message || "Failed to change password. Check old password.");
     }
   };
 
   const logout = async () => {
     try {
-      await apiClient.get("/api/farmers/logout", { withCredentials: true });
-      navigation?.navigate?.("Landing");
+      await apiClient.get("/api/farmers/logout", { withCredentials: true }); 
+      navigation?.navigate?.("Landing"); 
     } catch (error) {
-      showBanner("Logout failed");
+      showBanner("Logout failed.");
+      navigation?.navigate?.("Landing"); 
     }
   };
 
   const deleteAccount = async () => {
     Alert.alert(
-      "Delete Account",
-      "This action cannot be undone. Continue?",
+      "Permanently Delete Account",
+      "Are you sure you want to delete your account? This action cannot be undone.",
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -143,8 +148,8 @@ export default function FarmerProfileScreen({ navigation }) {
             } catch (error) {
               showBanner(error?.response?.data?.message || error.message || "Failed to delete account");
             }
-          }
-        }
+          },
+        },
       ]
     );
   };
@@ -158,7 +163,9 @@ export default function FarmerProfileScreen({ navigation }) {
     );
   }
 
-  const avatarUri = form.img || "https://i.ibb.co/0jqp8Qf/avatar.png";
+  const avatarUri = form.img || "https://i.ibb.co/0jqp8Qf/avatar.png"; 
+
+  const bannerStyle = banner.toLowerCase().includes("success") ? styles.bannerSuccess : (banner ? styles.bannerError : null);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -168,15 +175,16 @@ export default function FarmerProfileScreen({ navigation }) {
       >
         <View style={styles.header}>
           <Text style={styles.heading}>Farmer Profile</Text>
-          <Text style={styles.subHeading}>Manage your personal info and security</Text>
+          <Text style={styles.subHeading}>Manage your personal information and security settings.</Text>
         </View>
 
         {banner ? (
-          <View style={styles.banner}>
+          <View style={bannerStyle}>
             <Text style={styles.bannerText}>{banner}</Text>
           </View>
         ) : null}
 
+        {/* --- Profile Card: Avatar and Info/Form --- */}
         <View style={styles.profileCard}>
           <View style={styles.avatarWrapper}>
             <Image source={{ uri: avatarUri }} style={styles.avatar} />
@@ -185,19 +193,19 @@ export default function FarmerProfileScreen({ navigation }) {
                 style={styles.avatarOverlay}
                 onPress={() =>
                   Alert.alert(
-                    "Image Upload",
-                    "Hook up an image picker (e.g. expo-image-picker) to change the picture."
+                    "Image Update",
+                    "This feature requires integrating a local image picker (e.g. expo-image-picker)."
                   )
                 }
               >
-                <Feather name="camera" size={18} color={COLORS.mutedDark} />
-                <Text style={styles.overlayText}>Update</Text>
+                <Feather name="camera" size={20} color={COLORS.primary} />
               </TouchableOpacity>
             )}
           </View>
 
           <View style={styles.infoPanel}>
             {isChangingPassword ? (
+              // --- Change Password Form ---
               <>
                 <Text style={styles.sectionTitle}>Change Password</Text>
                 {Object.keys(EMPTY_PASSWORD).map((key, index) => (
@@ -211,71 +219,80 @@ export default function FarmerProfileScreen({ navigation }) {
                       value={passwordForm[key]}
                       onChangeText={(text) => handlePasswordChange(key, text)}
                       placeholder="••••••••"
+                      placeholderTextColor={COLORS.muted}
                     />
                   </View>
                 ))}
               </>
             ) : isEditing ? (
+              // --- Edit Profile Form ---
               <>
-                <Text style={styles.sectionTitle}>Edit Profile</Text>
-                {Object.keys(EMPTY_PROFILE).map((key) => (
-                  <View key={key} style={styles.formGroup}>
-                    <Text style={styles.label}>
-                      {key === "img"
-                        ? "Profile Image URL"
-                        : key.charAt(0).toUpperCase() + key.slice(1)}
-                    </Text>
-                    <TextInput
-                      style={styles.input}
-                      value={form[key]}
-                      autoCapitalize={key === "email" ? "none" : "sentences"}
-                      keyboardType={key === "phone" ? "phone-pad" : "default"}
-                      editable={key !== "email"}
-                      onChangeText={(text) => handleFormChange(key, text)}
-                      placeholder={`Enter ${key}`}
-                    />
-                  </View>
-                ))}
+                <Text style={styles.sectionTitle}>Edit Details</Text>
+                {Object.keys(EMPTY_PROFILE).map((key) => {
+                  if (key === "email" || key === "img") return null; 
+                  return (
+                    <View key={key} style={styles.formGroup}>
+                      <Text style={styles.label}>
+                        {key.charAt(0).toUpperCase() + key.slice(1)}
+                      </Text>
+                      <TextInput
+                        style={styles.input}
+                        value={form[key]}
+                        autoCapitalize={key === "name" ? "words" : "none"}
+                        keyboardType={key === "phone" ? "phone-pad" : "default"}
+                        onChangeText={(text) => handleFormChange(key, text)}
+                        placeholder={`Enter ${key}`}
+                        placeholderTextColor={COLORS.muted}
+                      />
+                    </View>
+                  );
+                })}
               </>
             ) : (
+              // --- Display View ---
               <>
                 <View style={styles.displayHeader}>
                   <View>
                     <Text style={styles.nameText}>{profile.name}</Text>
                     <View style={styles.locationRow}>
-                      <Feather name="map-pin" size={14} color={COLORS.muted} />
+                      <Feather name="map-pin" size={16} color={COLORS.primaryDark} />
                       <Text style={styles.locationText}>
-                        {profile.address || "Complete your address"}
+                        {profile.address || "Address incomplete"}
                       </Text>
                     </View>
                   </View>
                   <View style={styles.activePill}>
                     <View style={styles.activeDot} />
-                    <Text style={styles.activeText}>Active</Text>
+                    <Text style={styles.activeText}>Verified</Text>
                   </View>
                 </View>
 
                 <View style={styles.infoGrid}>
-                  <View style={styles.infoCard}>
-                    <Feather name="mail" size={18} color={COLORS.primary} />
-                    <Text style={styles.infoLabel}>Email</Text>
-                    <Text style={styles.infoValue}>{profile.email}</Text>
-                  </View>
-                  <View style={styles.infoCard}>
-                    <Feather name="phone" size={18} color={COLORS.primary} />
-                    <Text style={styles.infoLabel}>Phone</Text>
-                    <Text style={styles.infoValue}>
-                      {profile.phone || "Add phone number"}
-                    </Text>
-                  </View>
-                </View>
+  <View style={styles.infoCard}>
+    <View style={styles.infoHeaderRow}>
+      <Feather name="mail" size={20} color={COLORS.info} />
+      <Text style={styles.infoLabel}>Email Address</Text>
+    </View>
+    <Text style={styles.infoValue}>{profile.email}</Text>
+  </View>
+
+  <View style={styles.infoCard}>
+    <View style={styles.infoHeaderRow}>
+      <Feather name="phone" size={20} color={COLORS.info} />
+      <Text style={styles.infoLabel}>Contact Number</Text>
+    </View>
+    <Text style={styles.infoValue}>{profile.phone || "N/A"}</Text>
+  </View>
+</View>
+
               </>
             )}
           </View>
         </View>
 
+        {/* --- Action Buttons: Edit/Save/Cancel --- */}
         <View style={styles.actionsRow}>
-          {(isEditing || isChangingPassword) ? (
+          {isEditing || isChangingPassword ? (
             <>
               <TouchableOpacity
                 style={[styles.actionButton, styles.cancelButton]}
@@ -298,27 +315,29 @@ export default function FarmerProfileScreen({ navigation }) {
                 style={[styles.actionButton, styles.secondaryButton]}
                 onPress={() => setIsEditing(true)}
               >
-                <Feather name="edit-3" size={16} color={COLORS.info} />
+                <Feather name="edit-3" size={18} color={COLORS.primary} />
                 <Text style={styles.secondaryText}>Edit Profile</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.actionButton, styles.secondaryButton]}
                 onPress={() => setIsChangingPassword(true)}
               >
-                <Feather name="lock" size={16} color={COLORS.info} />
+                <Feather name="lock" size={18} color={COLORS.primary} />
                 <Text style={styles.secondaryText}>Change Password</Text>
               </TouchableOpacity>
             </>
           )}
         </View>
 
+        {/* --- Footer Actions: Logout and Delete --- */}
         <View style={styles.footerCard}>
           <TouchableOpacity style={styles.logoutButton} onPress={logout}>
-            <Feather name="log-out" size={18} color={COLORS.primaryDark} />
-            <Text style={styles.logoutText}>Logout</Text>
+            <Feather name="log-out" size={20} color={COLORS.primaryDark} />
+            <Text style={styles.logoutText}>Logout of Account</Text>
           </TouchableOpacity>
+          <View style={styles.separator} />
           <TouchableOpacity style={styles.deleteButton} onPress={deleteAccount}>
-            <Feather name="trash-2" size={18} color={COLORS.danger} />
+            <Feather name="trash-2" size={20} color={COLORS.danger} />
             <Text style={styles.deleteText}>Delete Account</Text>
           </TouchableOpacity>
         </View>
@@ -328,231 +347,251 @@ export default function FarmerProfileScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
+  // --- General Layout ---
   safeArea: {
     flex: 1,
-    backgroundColor: COLORS.background
+    // IMPROVEMENT: Softer, branded background color
+    backgroundColor: '#F0FFF0', 
   },
   contentContainer: {
     paddingHorizontal: 20,
-    paddingBottom: 32
+    paddingTop: 10,
+    paddingBottom: 40,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: COLORS.background
+    backgroundColor: '#F0FFF0',
   },
   loadingText: {
     marginTop: 8,
-    color: COLORS.muted
+    color: COLORS.mutedDark,
   },
+  // --- Header ---
   header: {
-    marginTop: 12,
-    marginBottom: 16
+    marginTop: 16,
+    marginBottom: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+    paddingBottom: 15,
   },
   heading: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: COLORS.primaryDark
+    fontSize: 30, // Larger
+    fontWeight: "800",
+    color: COLORS.primaryDark,
   },
   subHeading: {
     marginTop: 4,
-    color: COLORS.muted
+    color: COLORS.muted,
+    fontSize: 15,
   },
+  // --- Banner ---
   banner: {
-    backgroundColor: "#ecfccb",
     borderRadius: RADIUS.md,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    marginBottom: 16,
-    ...SHADOWS.soft
+    paddingVertical: 12, // Taller banner
+    paddingHorizontal: 15,
+    marginBottom: 20,
+    ...SHADOWS.soft,
+  },
+  bannerSuccess: {
+    backgroundColor: COLORS.success, // Use primary color for success banner BG
+    shadowColor: COLORS.success,
+  },
+  bannerError: {
+    backgroundColor: COLORS.danger,
+    shadowColor: COLORS.danger,
   },
   bannerText: {
-    color: "#3f6212",
-    fontWeight: "600",
-    fontSize: 13
+    color: COLORS.surface, // White text for maximum contrast
+    fontWeight: "700",
+    fontSize: 15,
+    textAlign: 'center',
   },
+  // --- Profile Card ---
   profileCard: {
     backgroundColor: COLORS.surface,
     borderRadius: RADIUS.lg,
-    padding: 18,
+    padding: 24,
     flexDirection: "row",
-    gap: 16,
-    marginBottom: 18,
-    ...SHADOWS.card
+    gap: 20,
+    marginBottom: 20,
+    ...SHADOWS.card,
+    shadowColor: COLORS.mutedDark, // Darker shadow for more lift
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
   },
   avatarWrapper: {
-    width: 110,
-    height: 110,
-    borderRadius: RADIUS.lg,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     overflow: "hidden",
-    borderWidth: 2,
-    borderColor: COLORS.primary
+    borderWidth: 4, // Thicker border
+    borderColor: COLORS.primary,
+    position: 'relative',
   },
   avatar: {
     width: "100%",
-    height: "100%"
+    height: "100%",
   },
   avatarOverlay: {
     position: "absolute",
     bottom: 0,
-    left: 0,
     right: 0,
-    backgroundColor: "rgba(255,255,255,0.92)",
-    paddingVertical: 6,
-    alignItems: "center",
-    gap: 4
-  },
-  overlayText: {
-    fontSize: 10,
-    color: COLORS.mutedDark,
-    fontWeight: "600"
+    backgroundColor: COLORS.surface,
+    borderRadius: 15,
+    padding: 6,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   infoPanel: {
-    flex: 1
+    flex: 1,
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: COLORS.mutedDark,
-    marginBottom: 10
+    fontSize: 18,
+    fontWeight: "800", // Bolder
+    color: COLORS.primaryDark,
+    marginBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+    paddingBottom: 5,
   },
-  displayHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 14
-  },
+  // --- Display View ---
   nameText: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: COLORS.mutedDark
-  },
-  locationRow: {
-    flexDirection: "row",
-    gap: 6,
-    alignItems: "center",
-    marginTop: 4
+    fontSize: 24,
+    fontWeight: "800",
+    color: COLORS.primaryDark,
   },
   locationText: {
     color: COLORS.muted,
-    fontSize: 13
+    fontSize: 14,
+    flexShrink: 1,
   },
   activePill: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#dcfce7",
+    backgroundColor: COLORS.accent,
+    opacity: 0.85,
     borderRadius: RADIUS.pill,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    gap: 6
-  },
-  activeDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: COLORS.success
+    paddingHorizontal: 12, // More padding
+    paddingVertical: 5,
+    gap: 6,
   },
   activeText: {
-    color: COLORS.primaryDark,
-    fontWeight: "600",
-    fontSize: 12
-  },
-  infoGrid: {
-    flexDirection: "row",
-    gap: 12
+    color: COLORS.surface,
+    fontWeight: "700",
+    fontSize: 14, // Slightly larger text
   },
   infoCard: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-    borderRadius: RADIUS.md,
-    padding: 12,
-    gap: 4
-  },
-  infoLabel: {
-    color: COLORS.muted,
-    fontSize: 12
-  },
-  infoValue: {
-    color: COLORS.mutedDark,
-    fontWeight: "600"
-  },
-  formGroup: {
-    marginBottom: 12
-  },
-  label: {
-    color: COLORS.muted,
-    marginBottom: 4
-  },
+  backgroundColor: "#F7FFF7",
+  borderRadius: RADIUS.md,
+  padding: 14,
+  width: "100%",
+  elevation: 2,
+},
+
+infoHeaderRow: {
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 8,
+  marginBottom: 6,   // creates spacing before value
+},
+
+infoLabel: {
+  fontSize: 14,
+  color: COLORS.mutedDark,
+  fontWeight: "600",
+},
+
+infoValue: {
+  color: COLORS.primaryDark,
+  fontWeight: "700",
+  fontSize: 15,
+  
+  marginLeft: 28, // aligns under label instead of icon
+},
+
+  // --- Form View ---
   input: {
     borderWidth: 1,
     borderColor: COLORS.border,
     borderRadius: RADIUS.md,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: COLORS.surface
+    paddingHorizontal: 15, // More padding
+    paddingVertical: 12, // Taller input
+    backgroundColor: '#F9F9F9', // Slight contrast background for inputs
+    color: COLORS.mutedDark,
+    fontSize: 16,
   },
-  actionsRow: {
-    flexDirection: "row",
-    gap: 12,
-    marginBottom: 16
-  },
+  // --- Action Buttons (Save/Edit/Cancel) ---
   actionButton: {
     flex: 1,
-    borderRadius: RADIUS.md,
-    paddingVertical: 12,
+    borderRadius: RADIUS.pill,
+    paddingVertical: 14, // Taller button
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "center",
-    gap: 8
+    gap: 8,
+    ...SHADOWS.soft,
   },
   cancelButton: {
-    backgroundColor: COLORS.border
+    backgroundColor: COLORS.border,
   },
   cancelText: {
     color: COLORS.mutedDark,
-    fontWeight: "600"
+    fontWeight: "800", // Extra bold
+    fontSize: 16,
   },
   saveButton: {
-    backgroundColor: COLORS.primary
+    backgroundColor: COLORS.primary,
   },
   saveText: {
-    color: "#fff",
-    fontWeight: "700"
+    color: COLORS.surface,
+    fontWeight: "800", // Extra bold
+    fontSize: 16,
   },
   secondaryButton: {
     backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.border
+    borderWidth: 2, // Thicker border
+    borderColor: COLORS.primary, // Primary color border
   },
   secondaryText: {
-    color: COLORS.info,
-    fontWeight: "600"
+    color: COLORS.primary, 
+    fontWeight: "700",
+    fontSize: 15,
   },
+  // --- Footer Actions (Logout/Delete) ---
   footerCard: {
     backgroundColor: COLORS.surface,
     borderRadius: RADIUS.lg,
-    padding: 16,
-    gap: 12,
-    ...SHADOWS.soft
+    padding: 20, // Increased padding
+    gap: 15,
+    ...SHADOWS.soft,
   },
   logoutButton: {
     flexDirection: "row",
-    gap: 8,
-    alignItems: "center"
+    gap: 12,
+    alignItems: "center",
+    paddingVertical: 5,
   },
   logoutText: {
     color: COLORS.primaryDark,
-    fontWeight: "600"
+    fontWeight: "700",
+    fontSize: 16,
+  },
+  separator: {
+    height: 1,
+    backgroundColor: COLORS.border,
+    marginVertical: 5,
   },
   deleteButton: {
     flexDirection: "row",
-    gap: 8,
-    alignItems: "center"
+    gap: 12,
+    alignItems: "center",
+    paddingVertical: 5,
   },
   deleteText: {
     color: COLORS.danger,
-    fontWeight: "600"
-  }
+    fontWeight: "700",
+    fontSize: 16,
+  },
 });
-
