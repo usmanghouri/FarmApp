@@ -137,12 +137,7 @@ export default function SupplierDashboardScreen({ navigation }) {
       
       {/* --- Custom Header --- */}
       <View style={styles.header}>
-        <TouchableOpacity 
-          onPress={() => navigation.dispatch(DrawerActions.openDrawer())}
-          style={styles.menuButton}
-        >
-          <Ionicons name="menu-outline" size={30} color={COLORS.surface} />
-        </TouchableOpacity>
+        
         <Text style={styles.headerTitle}>Supplier Dashboard</Text>
         <TouchableOpacity 
           onPress={() => navigation.navigate("SupplierProfile")}
