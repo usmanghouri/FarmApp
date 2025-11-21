@@ -5,14 +5,59 @@ import {
   StyleSheet,
   ActivityIndicator,
   ScrollView,
-  TouchableOpacity
+  TouchableOpacity,
+  SafeAreaView,
+  StatusBar
 } from "react-native";
 import { apiClient } from "../api/client";
 import { COLORS, SHADOWS, RADIUS } from "../styles/theme";
+import { Ionicons, Feather } from '@expo/vector-icons';
+import { DrawerActions } from '@react-navigation/native'; // For burger menu
 
-// Mobile version of src/pages/SupplierDashboard.jsx
-// Shows supplier stats and quick action tiles to the same logical pages
-// as on the web (orders, products, weather, profile, etc.).
+// --- Custom Components ---
+
+// Action Icon Mapping (Aligned with Supplier focus)
+const ACTION_ICONS = {
+  "Orders": "cube-outline",
+  "Products": "leaf-outline",
+  "Weather": "cloudy-night-outline",
+  "Profile": "person-circle-outline",
+  "Market Insights": "stats-chart-outline",
+};
+
+// Utility to map order status to color (reused from OrderManagement)
+const getStatusColor = (status) => {
+  const s = status?.toLowerCase();
+  if (s === 'delivered') return { bg: COLORS.success, text: COLORS.surface };
+  if (s === 'shipped') return { bg: COLORS.info, text: COLORS.surface };
+  if (s === 'canceled' || s === 'cancelled') return { bg: COLORS.danger, text: COLORS.surface };
+  return { bg: COLORS.warning, text: COLORS.primaryDark };
+};
+
+// StatCard Component (Enhanced with Icons and Colors)
+const StatCard = ({ label, value, subtitle, iconName, color }) => (
+  <View style={[styles.card, { backgroundColor: color || COLORS.surface, borderLeftColor: COLORS.primary, borderLeftWidth: 5 }]}>
+    <Ionicons name={iconName} size={28} color={COLORS.primary} style={styles.cardIcon} />
+    <Text style={styles.cardLabel}>{label}</Text>
+    <Text style={styles.cardValue}>{value}</Text>
+    {subtitle && <Text style={styles.cardSubtitle}>{subtitle}</Text>}
+  </View>
+);
+
+// ActionTile Component (Enhanced with Icons)
+const ActionTile = ({ label, description, onPress }) => (
+  <TouchableOpacity style={styles.actionTile} onPress={onPress}>
+    <Ionicons 
+      name={ACTION_ICONS[label] || 'cube-outline'} 
+      size={30} 
+      color={COLORS.primaryDark} 
+    />
+    <Text style={styles.actionLabel}>{label}</Text>
+    {description ? <Text style={styles.actionDescription}>{description}</Text> : null}
+  </TouchableOpacity>
+);
+
+// --- Main Component ---
 
 export default function SupplierDashboardScreen({ navigation }) {
   const [activeOrdersCount, setActiveOrdersCount] = useState(0);
@@ -31,9 +76,11 @@ export default function SupplierDashboardScreen({ navigation }) {
           "/api/v1/order/supplier-orders",
           { withCredentials: true }
         );
-        setActiveOrdersCount(ordersResponse.data?.count || 0);
-
+        
         const allOrders = ordersResponse.data?.orders || [];
+        const activeOrders = allOrders.filter(o => o.status === 'pending' || o.status === 'processing').length;
+        setActiveOrdersCount(activeOrders);
+
         setRecentOrders(allOrders.slice(0, 3));
 
         const currentMonth = new Date().getMonth();
@@ -70,7 +117,7 @@ export default function SupplierDashboardScreen({ navigation }) {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#16a34a" />
+        <ActivityIndicator size="large" color={COLORS.primary} />
         <Text style={styles.loadingText}>Loading supplier dashboard...</Text>
       </View>
     );
@@ -85,112 +132,165 @@ export default function SupplierDashboardScreen({ navigation }) {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.heading}>Supplier Dashboard</Text>
-
-      {/* Stats cards */}
-      <View style={styles.cardRow}>
-        <StatCard label="Active Orders" value={activeOrdersCount} />
-        <StatCard label="Products Listed" value={productsCount} />
-      </View>
-      <View style={styles.cardRow}>
-        <StatCard label="Revenue (Month)" value={`Rs. ${revenue.toLocaleString()}`} />
-        <StatCard label="Weather Status" value="Clear" subtitle="28°C - Islamabad" />
-      </View>
-
-      {/* Recent Orders Section */}
-      <Text style={styles.sectionTitle}>Recent Orders</Text>
-      <View style={styles.recentOrdersContainer}>
-        {recentOrders.length > 0 ? (
-          recentOrders.map((order) => (
-            <TouchableOpacity
-              key={order._id}
-              style={styles.orderItem}
-              onPress={() => navigation.navigate("OrderDetail", { orderId: order._id })}
-            >
-              <View>
-                <Text style={styles.orderId}>Order #{order._id?.slice(-6).toUpperCase()}</Text>
-                <Text style={styles.orderMeta}>
-                  {order.products[0]?.name || "N/A"} | Buyer: {order.userId?.slice(-6) || "N/A"}
-                </Text>
-              </View>
-              <Text
-                style={[
-                  styles.orderStatus,
-                  order.status === "delivered"
-                    ? styles.statusDelivered
-                    : order.status === "shipped"
-                    ? styles.statusShipped
-                    : styles.statusPending,
-                ]}
-              >
-                {order.status}
-              </Text>
-            </TouchableOpacity>
-          ))
-        ) : (
-          <Text style={styles.noDataText}>No recent orders found.</Text>
-        )}
-      </View>
-
-      {/* Quick navigation tiles aligned with supplier web dashboard */}
-      <Text style={styles.sectionTitle}>Quick Actions</Text>
-      <View style={styles.actionsGrid}>
-        <ActionTile
-          label="Orders"
-          description="Manage supplier orders"
-          onPress={() => navigation.navigate("OrderManagement")}
-        />
-        <ActionTile
-          label="Products"
-          description="Manage products"
-          onPress={() => navigation.navigate("ProductManagement")}
-        />
-        <ActionTile
-          label="Weather"
-          description="Weather alerts"
-          onPress={() => navigation.navigate("WeatherAlerts")}
-        />
-        <ActionTile
-          label="Profile"
-          description="Supplier profile"
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#F0FFF0' }}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.primaryDark} />
+      
+      {/* --- Custom Header --- */}
+      <View style={styles.header}>
+        <TouchableOpacity 
+          onPress={() => navigation.dispatch(DrawerActions.openDrawer())}
+          style={styles.menuButton}
+        >
+          <Ionicons name="menu-outline" size={30} color={COLORS.surface} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Supplier Dashboard</Text>
+        <TouchableOpacity 
           onPress={() => navigation.navigate("SupplierProfile")}
-        />
-        <ActionTile
-          label="Market Insights"
-          description="Analytics & trends"
-          onPress={() => navigation.navigate("MarketInsights")}
-        />
+          style={styles.profileButton}
+        >
+          <Ionicons name="person-circle-outline" size={30} color={COLORS.surface} />
+        </TouchableOpacity>
       </View>
-    </ScrollView>
+
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        
+        <Text style={styles.welcomeText}>Supplier Console Overview</Text>
+
+        {/* --- Stats cards --- */}
+        <View style={styles.cardSection}>
+            <View style={styles.cardRow}>
+                <StatCard 
+                    label="Active Orders" 
+                    value={activeOrdersCount} 
+                    iconName="time-outline"
+                    color={COLORS.surface}
+                />
+                <StatCard 
+                    label="Products Listed" 
+                    value={productsCount} 
+                    iconName="leaf-outline"
+                    color={COLORS.surface}
+                />
+            </View>
+            <View style={styles.cardRow}>
+                <StatCard 
+                    label={`Revenue (${new Date().toLocaleString('default', { month: 'short' })})`} 
+                    value={`Rs. ${revenue.toLocaleString()}`} 
+                    iconName="cash-outline"
+                    color={COLORS.surface}
+                />
+                {/* Mocked Weather Status Card */}
+                <StatCard 
+                    label="Weather Status" 
+                    value="Optimal" 
+                    subtitle="30°C / Light Wind" 
+                    iconName="cloudy-night-outline"
+                    color={COLORS.surface}
+                />
+            </View>
+        </View>
+
+        {/* --- Recent Orders Section --- */}
+        <Text style={styles.sectionTitle}>Recent Orders</Text>
+        <View style={styles.recentOrdersContainer}>
+            {recentOrders.length > 0 ? (
+                recentOrders.map((order) => {
+                    const statusStyle = getStatusColor(order.status);
+                    return (
+                        <TouchableOpacity
+                            key={order._id}
+                            style={styles.orderItem}
+                            onPress={() => navigation.navigate("OrderDetail", { orderId: order._id })}
+                        >
+                            <Feather name="truck" size={18} color={COLORS.primaryDark} />
+                            <View style={styles.orderInfo}>
+                                <Text style={styles.orderId}>Order #{order._id?.slice(-6).toUpperCase()}</Text>
+                                <Text style={styles.orderMeta}>
+                                    {order.products[0]?.name || "N/A"} | Items: {order.products.length}
+                                </Text>
+                            </View>
+                            <View
+                                style={[
+                                    styles.orderStatusBadge,
+                                    { backgroundColor: statusStyle.bg },
+                                ]}
+                            >
+                                <Text
+                                    style={[
+                                        styles.orderStatusText,
+                                        { color: statusStyle.text }
+                                    ]}
+                                >
+                                    {order.status}
+                                </Text>
+                            </View>
+                        </TouchableOpacity>
+                    );
+                })
+            ) : (
+                <Text style={styles.noDataText}>No recent orders found. Start listing products!</Text>
+            )}
+        </View>
+
+        {/* --- Quick Actions Grid --- */}
+        <Text style={styles.sectionTitle}>Quick Actions</Text>
+        <View style={styles.actionsGrid}>
+            <ActionTile label="Orders" description="Manage supplier orders" onPress={() => navigation.navigate("OrderManagement")} />
+            <ActionTile label="Products" description="Manage products" onPress={() => navigation.navigate("ProductManagement")} />
+            <ActionTile label="Weather" description="Weather alerts" onPress={() => navigation.navigate("WeatherAlerts")} />
+            <ActionTile label="Profile" description="Supplier profile" onPress={() => navigation.navigate("SupplierProfile")} />
+            <ActionTile label="Market Insights" description="Analytics & trends" onPress={() => navigation.navigate("MarketInsights")} />
+            {/* Added a placeholder tile to complete the grid layout */}
+            <ActionTile label="Support" description="Contact helpdesk" onPress={() => console.log('Support')} /> 
+        </View>
+        
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
-const StatCard = ({ label, value }) => (
-  <View style={styles.card}>
-    <Text style={styles.cardLabel}>{label}</Text>
-    <Text style={styles.cardValue}>{value}</Text>
-  </View>
-);
-
-const ActionTile = ({ label, description, onPress }) => (
-  <TouchableOpacity style={styles.actionTile} onPress={onPress}>
-    <Text style={styles.actionLabel}>{label}</Text>
-    {description ? <Text style={styles.actionDescription}>{description}</Text> : null}
-  </TouchableOpacity>
-);
-
+// Stylesheet remains the same with necessary theme application and structural adjustments
 const styles = StyleSheet.create({
-  container: {
+  // --- Header Styles ---
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 24,
-    backgroundColor: COLORS.background,
+    paddingVertical: 12,
+    backgroundColor: COLORS.primaryDark,
+    borderBottomLeftRadius: 10,
+    borderBottomRightRadius: 10,
+    ...SHADOWS.dark,
+    marginBottom: 5,
   },
-  heading: {
-    fontSize: 24,
+  headerTitle: {
+    fontSize: 20,
     fontWeight: "bold",
+    color: COLORS.surface,
+  },
+  menuButton: {
+    padding: 5,
+  },
+  profileButton: { 
+    padding: 5,
+  },
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: '#F0FFF0', // Soft green background
+  },
+  welcomeText: {
+    fontSize: 22,
+    fontWeight: "800",
     color: COLORS.primaryDark,
+    marginTop: 15,
     marginBottom: 20,
+    textAlign: 'center',
+  },
+  // --- Stats Card Styles ---
+  cardSection: {
+      marginBottom: 30,
   },
   cardRow: {
     flexDirection: "row",
@@ -201,27 +301,124 @@ const styles = StyleSheet.create({
   card: {
     flex: 1,
     backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.md,
+    borderRadius: RADIUS.lg,
     padding: 18,
     ...SHADOWS.card,
+    borderLeftWidth: 5,
+    borderColor: COLORS.primary,
+  },
+  cardIcon: {
+    alignSelf: 'flex-end',
+    marginBottom: 8,
   },
   cardLabel: {
     fontSize: 14,
     color: COLORS.muted,
-    marginBottom: 6,
+    marginBottom: 4,
     fontWeight: "600",
   },
   cardValue: {
-    fontSize: 22,
-    fontWeight: "bold",
-    color: COLORS.primary,
+    fontSize: 24,
+    fontWeight: "800",
+    color: COLORS.primaryDark,
+  },
+  cardSubtitle: {
+    fontSize: 12,
+    color: COLORS.muted,
+    marginTop: 2,
+  },
+  // --- Recent Orders ---
+  sectionTitle: {
+    marginTop: 10,
+    marginBottom: 15,
+    fontSize: 20,
+    fontWeight: "700",
+    color: COLORS.primaryDark,
+  },
+  recentOrdersContainer: {
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.lg,
+    paddingHorizontal: 16,
+    marginBottom: 20,
+    ...SHADOWS.soft,
+  },
+  orderItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+    gap: 10,
+  },
+  orderInfo: {
+      flex: 1,
+      marginLeft: 10,
+  },
+  orderId: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: COLORS.primaryDark,
+    marginBottom: 2,
+  },
+  orderMeta: {
+    fontSize: 13,
+    color: COLORS.muted,
+  },
+  orderStatusBadge: {
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: RADIUS.pill,
+  },
+  orderStatusText: {
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  // --- Quick Actions ---
+  actionsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+  },
+  actionTile: {
+    width: "48%",
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.md,
+    padding: 20,
+    marginBottom: 15,
+    ...SHADOWS.soft,
+    alignItems: "center",
+    minHeight: 120,
+    justifyContent: "space-between",
+    borderLeftWidth: 5,
+    borderColor: COLORS.info,
+  },
+  actionLabel: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: COLORS.primaryDark,
+    marginTop: 8,
+    textAlign: "center",
+  },
+  actionDescription: {
+    fontSize: 12,
+    color: COLORS.muted,
+    textAlign: "center",
+  },
+  // --- Utility ---
+  noDataText: {
+    textAlign: "center",
+    color: COLORS.muted,
+    fontStyle: "italic",
+    paddingVertical: 10,
+    width: '100%',
   },
   centered: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     padding: 24,
-    backgroundColor: COLORS.background,
+    backgroundColor: '#F0FFF0',
   },
   loadingText: {
     marginTop: 10,
@@ -234,91 +431,4 @@ const styles = StyleSheet.create({
     fontSize: 16,
     paddingHorizontal: 20,
   },
-  sectionTitle: {
-    marginTop: 25,
-    marginBottom: 15,
-    fontSize: 20,
-    fontWeight: "bold",
-    color: COLORS.primaryDark,
-  },
-  actionsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-  },
-  actionTile: {
-    width: "48%",
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.md,
-    padding: 15,
-    marginBottom: 15,
-    ...SHADOWS.soft,
-    justifyContent: "center",
-    alignItems: "center",
-    minHeight: 100,
-  },
-  actionLabel: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: COLORS.primaryDark,
-    marginBottom: 4,
-    textAlign: "center",
-  },
-  actionDescription: {
-    fontSize: 12,
-    color: COLORS.muted,
-    textAlign: "center",
-  },
-  recentOrdersContainer: {
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.md,
-    padding: 16,
-    marginBottom: 20,
-    ...SHADOWS.card,
-  },
-  orderItem: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.borderLight,
-  },
-  orderId: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: COLORS.primaryDark,
-    marginBottom: 2,
-  },
-  orderMeta: {
-    fontSize: 12,
-    color: COLORS.muted,
-  },
-  orderStatus: {
-    fontSize: 12,
-    fontWeight: "600",
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: RADIUS.sm,
-  },
-  statusPending: {
-    backgroundColor: COLORS.warningLight,
-    color: COLORS.warningDark,
-  },
-  statusShipped: {
-    backgroundColor: COLORS.infoLight,
-    color: COLORS.infoDark,
-  },
-  statusDelivered: {
-    backgroundColor: COLORS.successLight,
-    color: COLORS.successDark,
-  },
-  noDataText: {
-    textAlign: "center",
-    color: COLORS.muted,
-    fontStyle: "italic",
-    paddingVertical: 10,
-  },
 });
-
-

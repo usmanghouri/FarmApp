@@ -290,15 +290,15 @@ export default function LandingScreen() {
           <Text style={styles.statsTitle}>Growing Together. Thriving Together.</Text>
           <View style={styles.statsGrid}>
             <View style={styles.statCard}>
-              <Text style={styles.statNumber}>5,000+</Text>
+              <Text style={styles.statNumber}>5k+</Text>
               <Text style={styles.statLabel}>Farmers Connected</Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={styles.statNumber}>3,500+</Text>
+              <Text style={styles.statNumber}>3.5+</Text>
               <Text style={styles.statLabel}>Active Buyers</Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={styles.statNumber}>10,000+</Text>
+              <Text style={styles.statNumber}>10k+</Text>
               <Text style={styles.statLabel}>Products Listed</Text>
             </View>
           </View>
@@ -306,7 +306,7 @@ export default function LandingScreen() {
 
         {/* --- About Section (Improved) --- */}
         <View style={styles.section}>
-          <Text style={styles.sectionBadge}>About Us</Text>
+          {/* <Text style={styles.sectionBadge}>About Us</Text> */}
           <Text style={styles.sectionTitle}>About FarmConnect</Text>
           <View style={styles.aboutImageContainer}>
             <Image source={AboutImage} style={styles.aboutImage} />
@@ -553,8 +553,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 10, // Create a border effect similar to the web version
     left: 10,
-    right: -10,
-    bottom: -10,
+    right: 10,
+    bottom: 10,
     borderRadius: RADIUS.md,
     borderWidth: 2,
     borderColor: COLORS.secondaryLight,

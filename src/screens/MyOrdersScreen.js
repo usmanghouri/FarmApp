@@ -23,7 +23,7 @@ const emptyReview = {
   comment: "",
 };
 
-// Utility function to get status colors dynamically
+// Utility function to get status colors dynamically (Remains the same)
 const getStatusStyles = (status) => {
   const s = status?.toLowerCase();
   switch (s) {
@@ -129,11 +129,21 @@ export default function MyOrdersScreen({ navigation }) {
       );
       setActionMessage("Review submitted successfully!");
       setReviewForm(emptyReview);
+      fetchOrders();
     } catch (err) {
       const msg = err?.response?.data?.message || err.message || "Failed to submit review";
       setActionMessage(msg);
     }
   };
+
+  // --- NEW: Role-based navigation for "Continue Shopping" ---
+  const handleContinueShopping = () => {
+      // Assuming this screen is primarily reached by the Buyer/User role.
+      // If used by a Farmer/Supplier to buy, they would navigate to "FarmerProducts".
+      // We will default to "BuyerProducts" which is the general marketplace browse screen.
+      navigation?.navigate?.("BuyerProducts"); 
+  };
+  // --- END NEW LOGIC ---
 
   if (loading) {
     return (
@@ -162,7 +172,7 @@ export default function MyOrdersScreen({ navigation }) {
         <Text style={styles.heading}>My Orders</Text>
         <TouchableOpacity
           style={styles.primaryButton}
-          onPress={() => navigation?.navigate?.("FarmerProducts")}
+          onPress={handleContinueShopping} // FIX: Use the new handler
         >
           <Text style={styles.primaryButtonText}>Continue Shopping</Text>
         </TouchableOpacity>
@@ -183,7 +193,11 @@ export default function MyOrdersScreen({ navigation }) {
           const canCancel = item.status === "pending" || item.status === "processing";
 
           return (
-            <View style={styles.card}>
+            <TouchableOpacity 
+                style={styles.card}
+                // Navigate to OrderDetail screen on card press
+                onPress={() => navigation.navigate("OrderDetail", { orderId: item._id })}
+            >
               {/* Order Header */}
               <View style={styles.cardHeader}>
                 <View>
@@ -247,7 +261,7 @@ export default function MyOrdersScreen({ navigation }) {
                   <Text style={styles.cancelButtonText}>Cancel Order</Text>
                 </TouchableOpacity>
               )}
-            </View>
+            </TouchableOpacity>
           );
         }}
         ListEmptyComponent={
@@ -306,7 +320,6 @@ export default function MyOrdersScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    // IMPROVEMENT: Soft green background
     backgroundColor: '#F0FFF0', 
     paddingHorizontal: 16,
     paddingTop: 16,
@@ -315,7 +328,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 16, // Increased spacing
+    marginBottom: 16, 
   },
   heading: {
     fontSize: 26,
@@ -325,7 +338,7 @@ const styles = StyleSheet.create({
   primaryButton: {
     backgroundColor: COLORS.primary,
     borderRadius: RADIUS.pill,
-    paddingHorizontal: 16, // More padding
+    paddingHorizontal: 16, 
     paddingVertical: 8,
     ...SHADOWS.soft,
   },
@@ -358,11 +371,11 @@ const styles = StyleSheet.create({
   // --- Order Card ---
   card: {
     backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.lg, // Larger radius
-    padding: 20, // More padding
+    borderRadius: RADIUS.lg, 
+    padding: 20, 
     marginBottom: 16,
     ...SHADOWS.card,
-    borderLeftWidth: 6, // Themed border
+    borderLeftWidth: 6, 
     borderColor: COLORS.primary,
   },
   cardHeader: {
@@ -395,10 +408,10 @@ const styles = StyleSheet.create({
   statusBadgeText: {
     fontSize: 12,
     fontWeight: "800",
-    color: COLORS.surface, // Text color set by getStatusStyles
+    color: COLORS.surface, 
   },
   amountText: {
-    fontSize: 22, // Largest font for price
+    fontSize: 22, 
     fontWeight: "900",
     color: COLORS.primaryDark,
     marginTop: 5,
@@ -443,7 +456,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: RADIUS.pill,
-    backgroundColor: COLORS.info, // Use theme color
+    backgroundColor: COLORS.info, 
     alignSelf: "flex-start",
     marginLeft: 10,
   },
@@ -456,7 +469,7 @@ const styles = StyleSheet.create({
   cancelButton: {
     marginTop: 15,
     borderRadius: RADIUS.pill,
-    paddingVertical: 14, // Taller button
+    paddingVertical: 14, 
     alignItems: "center",
     backgroundColor: COLORS.danger,
     ...SHADOWS.soft,
@@ -532,13 +545,13 @@ const styles = StyleSheet.create({
     marginBottom: 15
   },
   star: {
-    fontSize: 32, // Larger stars
+    fontSize: 32, 
     color: COLORS.border,
     marginRight: 10
   },
   starActive: {
     fontSize: 32,
-    color: COLORS.warning, // Theme warning color for gold stars
+    color: COLORS.warning, 
     marginRight: 10
   },
   input: {

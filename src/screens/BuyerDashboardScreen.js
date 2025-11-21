@@ -6,14 +6,50 @@ import {
   ActivityIndicator,
   ScrollView,
   TouchableOpacity,
-  Image
+  Image,
+  SafeAreaView,
+  StatusBar
 } from "react-native";
 import { apiClient } from "../api/client";
 import { COLORS, SHADOWS, RADIUS } from "../styles/theme";
+import { Ionicons, Feather } from '@expo/vector-icons';
+import { DrawerActions } from '@react-navigation/native'; // For burger menu
 
-// Mobile version of src/pages/BuyerDashboard.jsx
-// Shows key stats and quick navigation tiles to the same destinations
-// as the web dashboard cards and links.
+// --- Custom Components ---
+
+// Action Icon Mapping
+const ACTION_ICONS = {
+  "Browse Products": "basket-outline",
+  "My Cart": "cart-outline",
+  "My Orders": "list-circle-outline",
+  "Wishlist": "heart-outline",
+  "Profile": "person-circle-outline",
+  "Market Insights": "stats-chart-outline", // Added for clarity
+};
+
+// StatCard Component (Enhanced with Icons and Colors)
+const StatCard = ({ label, value, iconName, color }) => (
+  <View style={[styles.card, { backgroundColor: color || COLORS.surface, borderLeftColor: COLORS.primary, borderLeftWidth: 5 }]}>
+    <Ionicons name={iconName} size={28} color={COLORS.primary} style={styles.cardIcon} />
+    <Text style={styles.cardLabel}>{label}</Text>
+    <Text style={styles.cardValue}>{value}</Text>
+  </View>
+);
+
+// ActionTile Component (Enhanced with Icons)
+const ActionTile = ({ label, description, onPress }) => (
+  <TouchableOpacity style={styles.actionTile} onPress={onPress}>
+    <Ionicons 
+      name={ACTION_ICONS[label] || 'cube-outline'} 
+      size={30} 
+      color={COLORS.primaryDark} 
+    />
+    <Text style={styles.actionLabel}>{label}</Text>
+    {description ? <Text style={styles.actionDescription}>{description}</Text> : null}
+  </TouchableOpacity>
+);
+
+// --- Main Component ---
 
 export default function BuyerDashboardScreen({ navigation }) {
   const [ordersCount, setOrdersCount] = useState(0);
@@ -49,8 +85,8 @@ export default function BuyerDashboardScreen({ navigation }) {
         setCartCount(cartRes.data?.cart?.products?.length || 0);
 
         const productsResponse = await apiClient.get(
-            "/api/products/all",
-            { withCredentials: true }
+          "/api/products/all",
+          { withCredentials: true }
         );
         setRecommendedProducts(
             productsResponse.data.products?.slice(0, 4) || []
@@ -67,10 +103,19 @@ export default function BuyerDashboardScreen({ navigation }) {
     fetchData();
   }, []);
 
+  // Utility to map status to color
+  const getStatusColor = (status) => {
+    const s = status?.toLowerCase();
+    if (s === 'delivered') return { bg: COLORS.success, text: COLORS.surface };
+    if (s === 'shipped') return { bg: COLORS.info, text: COLORS.surface };
+    if (s === 'canceled' || s === 'cancelled') return { bg: COLORS.danger, text: COLORS.surface };
+    return { bg: COLORS.warning, text: COLORS.primaryDark };
+  };
+
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#16a34a" />
+        <ActivityIndicator size="large" color={COLORS.primary} />
         <Text style={styles.loadingText}>Loading buyer dashboard...</Text>
       </View>
     );
@@ -79,144 +124,191 @@ export default function BuyerDashboardScreen({ navigation }) {
   if (error) {
     return (
       <View style={styles.centered}>
+        <Text style={styles.errorTitle}>Error</Text>
         <Text style={styles.errorText}>{error}</Text>
       </View>
     );
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.heading}>Buyer Dashboard</Text>
-
-      {/* Stats cards */}
-      <View style={styles.cardRow}>
-        <StatCard label="My Orders" value={ordersCount} />
-        <StatCard label="Wishlist" value={wishlistCount} />
-      </View>
-      <View style={styles.cardRow}>
-        <StatCard label="Cart Items" value={cartCount} />
-      </View>
-
-      {/* Recent Orders Section */}
-      <Text style={styles.sectionTitle}>Recent Orders</Text>
-      <View style={styles.recentOrdersContainer}>
-        {recentOrders.length > 0 ? (
-          recentOrders.map((order) => (
-            <TouchableOpacity
-              key={order._id}
-              style={styles.orderItem}
-              onPress={() => navigation.navigate("OrderDetail", { orderId: order._id })}
-            >
-              <View>
-                <Text style={styles.orderId}>Order #{order._id.slice(-6)}</Text>
-                <Text style={styles.orderMeta}>
-                  {order.products.length} item{order.products.length !== 1 ? "s" : ""} |{" "}
-                  {new Date(order.createdAt).toLocaleDateString()}
-                </Text>
-              </View>
-              <Text
-                style={[
-                  styles.orderStatus,
-                  order.status === "delivered"
-                    ? styles.statusDelivered
-                    : order.status === "shipped"
-                    ? styles.statusShipped
-                    : styles.statusPending,
-                ]}
-              >
-                {order.status}
-              </Text>
-            </TouchableOpacity>
-          ))
-        ) : (
-          <Text style={styles.noDataText}>No recent orders found.</Text>
-        )}
-      </View>
-
-      {/* Recommended Products Section */}
-      <Text style={styles.sectionTitle}>Recommended Products</Text>
-      <View style={styles.recommendedProductsContainer}>
-        {recommendedProducts.length > 0 ? (
-          recommendedProducts.map((product) => (
-            <TouchableOpacity
-              key={product._id}
-              style={styles.productItem}
-              onPress={() => navigation.navigate("ProductDetail", { productId: product._id })}
-            >
-              <Image
-                source={{ uri: product.images[0] || "https://via.placeholder.com/50" }}
-                style={styles.productImage}
-              />
-              <View style={styles.productInfo}>
-                <Text style={styles.productName}>{product.name}</Text>
-                <Text style={styles.productCategory}>{product.category}</Text>
-                <Text style={styles.productPrice}>₨ {product.price.toLocaleString()}</Text>
-              </View>
-            </TouchableOpacity>
-          ))
-        ) : (
-          <Text style={styles.noDataText}>No recommended products found.</Text>
-        )}
-      </View>
-
-      {/* Quick navigation tiles mirroring the web buyer dashboard */}
-      <Text style={styles.sectionTitle}>Quick Actions</Text>
-      <View style={styles.actionsGrid}>
-        <ActionTile
-          label="Browse Products"
-          description="View marketplace"
-          onPress={() => navigation.navigate("BuyerProducts")}
-        />
-        <ActionTile
-          label="My Cart"
-          description="Checkout items"
-          onPress={() => navigation.navigate("BuyerCart")}
-        />
-        <ActionTile
-          label="My Orders"
-          description="Order history"
-          onPress={() => navigation.navigate("MyOrders")}
-        />
-        <ActionTile
-          label="Wishlist"
-          description="Saved products"
-          onPress={() => navigation.navigate("Wishlist")}
-        />
-        <ActionTile
-          label="Profile"
-          description="Buyer profile"
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#F0FFF0' }}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.primaryDark} />
+      
+      {/* --- Custom Header --- */}
+      <View style={styles.header}>
+        {/* FIX: Re-added Menu Button with Drawer Action */}
+        {/* <TouchableOpacity 
+          onPress={() => navigation.dispatch(DrawerActions.openDrawer())}
+          style={styles.menuButton}
+        >
+          <Ionicons name="menu-outline" size={30} color={COLORS.surface} />
+        </TouchableOpacity> */}
+        <Text style={styles.headerTitle}>Buyer Dashboard</Text>
+        <TouchableOpacity 
           onPress={() => navigation.navigate("BuyerProfile")}
-        />
+          style={styles.profileButton}
+        >
+          <Ionicons name="person-circle-outline" size={30} color={COLORS.surface} />
+        </TouchableOpacity>
       </View>
-    </ScrollView>
+
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        
+        <Text style={styles.welcomeText}>Your Activity Snapshot</Text>
+
+        {/* --- Stats Cards --- */}
+        <View style={styles.cardSection}>
+            <View style={styles.cardRow}>
+                <StatCard 
+                    label="Total Orders" 
+                    value={ordersCount} 
+                    iconName="receipt-outline"
+                    color={COLORS.surface}
+                />
+                <StatCard 
+                    label="Wishlist Items" 
+                    value={wishlistCount} 
+                    iconName="heart-outline"
+                    color={COLORS.surface}
+                />
+            </View>
+            <View style={styles.cardRow}>
+                <StatCard 
+                    label="Items in Cart" 
+                    value={cartCount} 
+                    iconName="cart-outline"
+                    color={COLORS.surface}
+                    style={{ flex: 0.5, marginRight: 10 }}
+                />
+            </View>
+        </View>
+
+        {/* --- Recent Orders Section --- */}
+        <Text style={styles.sectionTitle}>Recent Orders</Text>
+        <View style={styles.recentOrdersContainer}>
+            {recentOrders.length > 0 ? (
+                recentOrders.map((order) => {
+                    const statusStyle = getStatusColor(order.status);
+                    return (
+                        <TouchableOpacity
+                            key={order._id}
+                            style={styles.orderItem}
+                            // FIX: Navigate to OrderDetail with orderId
+                            onPress={() => navigation.navigate("OrderDetail", { orderId: order._id })}
+                        >
+                            <Feather name="package" size={18} color={COLORS.primaryDark} />
+                            <View style={styles.orderInfo}>
+                                <Text style={styles.orderId}>Order #{order._id.slice(-6)}</Text>
+                                <Text style={styles.orderMeta}>
+                                    {order.products.length} item{order.products.length !== 1 ? "s" : ""} | {new Date(order.createdAt).toLocaleDateString()}
+                                </Text>
+                            </View>
+                            <View
+                                style={[
+                                    styles.orderStatusBadge,
+                                    { backgroundColor: statusStyle.bg },
+                                ]}
+                            >
+                                <Text
+                                    style={[
+                                        styles.orderStatusText,
+                                        { color: statusStyle.text }
+                                    ]}
+                                >
+                                    {order.status}
+                                </Text>
+                            </View>
+                        </TouchableOpacity>
+                    );
+                })
+            ) : (
+                <Text style={styles.noDataText}>No recent orders found.</Text>
+            )}
+        </View>
+
+        {/* --- Recommended Products Section --- */}
+        <Text style={styles.sectionTitle}>Recommended for You</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginBottom: 20}}>
+            {recommendedProducts.length > 0 ? (
+                recommendedProducts.map((product) => (
+                    <TouchableOpacity
+                        key={product._id}
+                        style={styles.productItem}
+                        onPress={() => navigation.navigate("BuyerProducts", { productId: product._id })}
+                    >
+                        <Image
+                            source={{ uri: product.images?.[0] || "https://via.placeholder.com/50" }}
+                            style={styles.productImage}
+                        />
+                        <View style={styles.productInfo}>
+                            <Text style={styles.productName} numberOfLines={1}>{product.name}</Text>
+                            <Text style={styles.productPrice}>₨ {product.price.toLocaleString()}</Text>
+                        </View>
+                    </TouchableOpacity>
+                ))
+            ) : (
+                <Text style={styles.noDataText}>No recommended products found.</Text>
+            )}
+        </ScrollView>
+
+        {/* --- Quick Actions Grid --- */}
+        <Text style={styles.sectionTitle}>Quick Access</Text>
+        <View style={styles.actionsGrid}>
+            <ActionTile label="Browse Products" description="View marketplace" onPress={() => navigation.navigate("BuyerProducts")} />
+            <ActionTile label="My Cart" description="Checkout items" onPress={() => navigation.navigate("BuyerCart")} />
+            {/* FIX: Ensure this tile navigates to the MyOrders list screen */}
+            <ActionTile label="My Orders" description="Order history" onPress={() => navigation.navigate("MyOrders")} /> 
+            <ActionTile label="Wishlist" description="Saved products" onPress={() => navigation.navigate("Wishlist")} />
+            <ActionTile label="Profile" description="Buyer profile" onPress={() => navigation.navigate("BuyerProfile")} />
+            <ActionTile label="Market Insights" description="View trends" onPress={() => navigation.navigate("MarketInsights")} />
+        </View>
+        
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
-const StatCard = ({ label, value }) => (
-  <View style={styles.card}>
-    <Text style={styles.cardLabel}>{label}</Text>
-    <Text style={styles.cardValue}>{value}</Text>
-  </View>
-);
-
-const ActionTile = ({ label, description, onPress }) => (
-  <TouchableOpacity style={styles.actionTile} onPress={onPress}>
-    <Text style={styles.actionLabel}>{label}</Text>
-    {description ? <Text style={styles.actionDescription}>{description}</Text> : null}
-  </TouchableOpacity>
-);
-
 const styles = StyleSheet.create({
-  container: {
+  // --- General Layout & Header ---
+  scrollContent: {
     paddingHorizontal: 16,
-    paddingVertical: 24,
-    backgroundColor: COLORS.background,
+    paddingVertical: 10,
+    backgroundColor: '#F0FFF0', // Soft green background
   },
-  heading: {
-    fontSize: 24,
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: COLORS.primaryDark,
+    borderBottomLeftRadius: 10,
+    borderBottomRightRadius: 10,
+    ...SHADOWS.dark,
+    marginBottom: 5,
+  },
+  headerTitle: {
+    fontSize: 20,
     fontWeight: "bold",
+    color: COLORS.surface,
+  },
+  menuButton: {
+    padding: 5,
+  },
+  profileButton: { 
+    padding: 5,
+  },
+  welcomeText: {
+    fontSize: 22,
+    fontWeight: "800",
     color: COLORS.primaryDark,
+    marginTop: 15,
     marginBottom: 20,
+    textAlign: 'center',
+  },
+  // --- Stats Cards ---
+  cardSection: {
+      marginBottom: 30,
   },
   cardRow: {
     flexDirection: "row",
@@ -227,46 +319,110 @@ const styles = StyleSheet.create({
   card: {
     flex: 1,
     backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.md,
+    borderRadius: RADIUS.lg,
     padding: 18,
     ...SHADOWS.card,
+  },
+  cardIcon: {
+    alignSelf: 'flex-end',
+    marginBottom: 8,
   },
   cardLabel: {
     fontSize: 14,
     color: COLORS.muted,
-    marginBottom: 6,
+    marginBottom: 4,
     fontWeight: "600",
   },
   cardValue: {
-    fontSize: 22,
-    fontWeight: "bold",
-    color: COLORS.primary,
-  },
-  centered: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 24,
-    backgroundColor: COLORS.background,
-  },
-  loadingText: {
-    marginTop: 10,
-    color: COLORS.mutedDark,
-    fontSize: 15,
-  },
-  errorText: {
-    color: COLORS.danger,
-    textAlign: "center",
-    fontSize: 16,
-    paddingHorizontal: 20,
-  },
-  sectionTitle: {
-    marginTop: 25,
-    marginBottom: 15,
-    fontSize: 20,
-    fontWeight: "bold",
+    fontSize: 24,
+    fontWeight: "800",
     color: COLORS.primaryDark,
   },
+  // --- Section Headings ---
+  sectionTitle: {
+    marginTop: 10,
+    marginBottom: 15,
+    fontSize: 20,
+    fontWeight: "700",
+    color: COLORS.primaryDark,
+  },
+  // --- Recent Orders ---
+  recentOrdersContainer: {
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.lg,
+    paddingHorizontal: 16,
+    marginBottom: 20,
+    ...SHADOWS.soft,
+  },
+  orderItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+    gap: 10,
+  },
+  orderInfo: {
+      flex: 1,
+      marginLeft: 10,
+  },
+  orderId: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: COLORS.primaryDark,
+    marginBottom: 2,
+  },
+  orderMeta: {
+    fontSize: 13,
+    color: COLORS.muted,
+  },
+  orderStatusBadge: {
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: RADIUS.pill,
+  },
+  orderStatusText: {
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  // --- Recommended Products ---
+  recommendedProductsContainer: {
+    flexDirection: 'row',
+    gap: 15,
+  },
+  productItem: {
+    width: 150,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.lg,
+    padding: 10,
+    marginRight: 10,
+    ...SHADOWS.soft,
+    alignItems: 'center',
+    borderBottomWidth: 3,
+    borderColor: COLORS.accent,
+  },
+  productImage: {
+    width: '100%',
+    height: 100,
+    borderRadius: RADIUS.md,
+    marginBottom: 8,
+  },
+  productName: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: COLORS.primaryDark,
+    marginBottom: 2,
+    textAlign: 'center',
+  },
+  productPrice: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: COLORS.primary,
+    marginTop: 2,
+    textAlign: 'center',
+  },
+  // --- Quick Actions ---
   actionsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -276,18 +432,20 @@ const styles = StyleSheet.create({
     width: "48%",
     backgroundColor: COLORS.surface,
     borderRadius: RADIUS.md,
-    padding: 15,
+    padding: 20,
     marginBottom: 15,
     ...SHADOWS.soft,
-    justifyContent: "center",
     alignItems: "center",
-    minHeight: 100,
+    minHeight: 120,
+    justifyContent: "space-between",
+    borderLeftWidth: 5,
+    borderColor: COLORS.info, // Use info color for navigation
   },
   actionLabel: {
     fontSize: 16,
-    fontWeight: "bold",
+    fontWeight: "700",
     color: COLORS.primaryDark,
-    marginBottom: 4,
+    marginTop: 8,
     textAlign: "center",
   },
   actionDescription: {
@@ -295,98 +453,37 @@ const styles = StyleSheet.create({
     color: COLORS.muted,
     textAlign: "center",
   },
-  recentOrdersContainer: {
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.md,
-    padding: 16,
-    marginBottom: 20,
-    ...SHADOWS.card,
-  },
-  orderItem: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.borderLight,
-  },
-  orderId: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: COLORS.primaryDark,
-    marginBottom: 2,
-  },
-  orderMeta: {
-    fontSize: 12,
-    color: COLORS.muted,
-  },
-  orderStatus: {
-    fontSize: 12,
-    fontWeight: "600",
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: RADIUS.sm,
-  },
-  statusPending: {
-    backgroundColor: COLORS.warningLight,
-    color: COLORS.warningDark,
-  },
-  statusShipped: {
-    backgroundColor: COLORS.infoLight,
-    color: COLORS.infoDark,
-  },
-  statusDelivered: {
-    backgroundColor: COLORS.successLight,
-    color: COLORS.successDark,
-  },
+  // --- Utility ---
   noDataText: {
     textAlign: "center",
     color: COLORS.muted,
     fontStyle: "italic",
     paddingVertical: 10,
+    width: '100%',
   },
-  recommendedProductsContainer: {
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.md,
-    padding: 16,
-    marginBottom: 20,
-    ...SHADOWS.card,
-  },
-  productItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 12,
-    padding: 10,
-    backgroundColor: COLORS.background,
-    borderRadius: RADIUS.sm,
-    ...SHADOWS.soft,
-  },
-  productImage: {
-    width: 60,
-    height: 60,
-    borderRadius: RADIUS.sm,
-    marginRight: 15,
-    resizeMode: "cover",
-  },
-  productInfo: {
+  centered: {
     flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+    backgroundColor: '#F0FFF0',
   },
-  productName: {
+  loadingText: {
+    marginTop: 10,
+    color: COLORS.mutedDark,
     fontSize: 15,
-    fontWeight: "bold",
-    color: COLORS.primaryDark,
-    marginBottom: 2,
   },
-  productCategory: {
-    fontSize: 12,
-    color: COLORS.muted,
-    marginBottom: 4,
+  errorTitle: {
+    color: COLORS.danger,
+    textAlign: "center",
+    fontSize: 20,
+    fontWeight: '700',
   },
-  productPrice: {
-    fontSize: 15,
-    fontWeight: "bold",
-    color: COLORS.primary,
+  errorText: {
+    color: COLORS.mutedDark,
+    textAlign: "center",
+    fontSize: 16,
+    paddingHorizontal: 20,
+    marginTop: 5,
   },
 });
-
-
