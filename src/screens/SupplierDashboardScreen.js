@@ -12,7 +12,9 @@ import {
 import { apiClient } from "../api/client";
 import { COLORS, SHADOWS, RADIUS } from "../styles/theme";
 import { Ionicons, Feather } from '@expo/vector-icons';
-import { DrawerActions } from '@react-navigation/native'; // For burger menu
+import { DrawerActions } from '@react-navigation/native';
+import { useLanguage } from "../context/LanguageContext";
+import { translations } from "../translations/translations";
 
 // --- Custom Components ---
 
@@ -23,6 +25,7 @@ const ACTION_ICONS = {
   "Weather": "cloudy-night-outline",
   "Profile": "person-circle-outline",
   "Market Insights": "stats-chart-outline",
+  "Support": "help-circle-outline",
 };
 
 // Utility to map order status to color (reused from OrderManagement)
@@ -45,10 +48,10 @@ const StatCard = ({ label, value, subtitle, iconName, color }) => (
 );
 
 // ActionTile Component (Enhanced with Icons)
-const ActionTile = ({ label, description, onPress }) => (
+const ActionTile = ({ label, description, onPress, iconKey }) => (
   <TouchableOpacity style={styles.actionTile} onPress={onPress}>
     <Ionicons 
-      name={ACTION_ICONS[label] || 'cube-outline'} 
+      name={ACTION_ICONS[iconKey || label] || 'cube-outline'} 
       size={30} 
       color={COLORS.primaryDark} 
     />
@@ -60,6 +63,8 @@ const ActionTile = ({ label, description, onPress }) => (
 // --- Main Component ---
 
 export default function SupplierDashboardScreen({ navigation }) {
+  const { language, toggleLanguage } = useLanguage();
+  const t = translations[language].supplierDashboard;
   const [activeOrdersCount, setActiveOrdersCount] = useState(0);
   const [productsCount, setProductsCount] = useState(0);
   const [revenue, setRevenue] = useState(0);
@@ -118,7 +123,7 @@ export default function SupplierDashboardScreen({ navigation }) {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Loading supplier dashboard...</Text>
+        <Text style={styles.loadingText}>{t.loading}</Text>
       </View>
     );
   }
@@ -137,8 +142,15 @@ export default function SupplierDashboardScreen({ navigation }) {
       
       {/* --- Custom Header --- */}
       <View style={styles.header}>
+        {/* Language Toggle Button */}
+        <TouchableOpacity 
+          onPress={toggleLanguage}
+          style={styles.languageButton}
+        >
+          <Text style={styles.languageText}>{language === "en" ? "اردو" : "EN"}</Text>
+        </TouchableOpacity>
         
-        <Text style={styles.headerTitle}>Supplier Dashboard</Text>
+        <Text style={styles.headerTitle}>{t.title}</Text>
         <TouchableOpacity 
           onPress={() => navigation.navigate("SupplierProfile")}
           style={styles.profileButton}
@@ -149,19 +161,19 @@ export default function SupplierDashboardScreen({ navigation }) {
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         
-        <Text style={styles.welcomeText}>Supplier Console Overview</Text>
+        <Text style={styles.welcomeText}>{t.welcome}</Text>
 
         {/* --- Stats cards --- */}
         <View style={styles.cardSection}>
             <View style={styles.cardRow}>
                 <StatCard 
-                    label="Active Orders" 
+                    label={t.activeOrders} 
                     value={activeOrdersCount} 
                     iconName="time-outline"
                     color={COLORS.surface}
                 />
                 <StatCard 
-                    label="Products Listed" 
+                    label={t.productsListed} 
                     value={productsCount} 
                     iconName="leaf-outline"
                     color={COLORS.surface}
@@ -169,14 +181,14 @@ export default function SupplierDashboardScreen({ navigation }) {
             </View>
             <View style={styles.cardRow}>
                 <StatCard 
-                    label={`Revenue (${new Date().toLocaleString('default', { month: 'short' })})`} 
+                    label={`${t.revenue} (${new Date().toLocaleString('default', { month: 'short' })})`} 
                     value={`Rs. ${revenue.toLocaleString()}`} 
                     iconName="cash-outline"
                     color={COLORS.surface}
                 />
                 {/* Mocked Weather Status Card */}
                 <StatCard 
-                    label="Weather Status" 
+                    label={t.weatherStatus} 
                     value="Optimal" 
                     subtitle="30°C / Light Wind" 
                     iconName="cloudy-night-outline"
@@ -186,7 +198,7 @@ export default function SupplierDashboardScreen({ navigation }) {
         </View>
 
         {/* --- Recent Orders Section --- */}
-        <Text style={styles.sectionTitle}>Recent Orders</Text>
+        <Text style={styles.sectionTitle}>{t.recentOrders}</Text>
         <View style={styles.recentOrdersContainer}>
             {recentOrders.length > 0 ? (
                 recentOrders.map((order) => {
@@ -223,20 +235,19 @@ export default function SupplierDashboardScreen({ navigation }) {
                     );
                 })
             ) : (
-                <Text style={styles.noDataText}>No recent orders found. Start listing products!</Text>
+                <Text style={styles.noDataText}>{t.noRecentOrders}</Text>
             )}
         </View>
 
         {/* --- Quick Actions Grid --- */}
-        <Text style={styles.sectionTitle}>Quick Actions</Text>
+        <Text style={styles.sectionTitle}>{t.quickActions}</Text>
         <View style={styles.actionsGrid}>
-            <ActionTile label="Orders" description="Manage supplier orders" onPress={() => navigation.navigate("OrderManagement")} />
-            <ActionTile label="Products" description="Manage products" onPress={() => navigation.navigate("ProductManagement")} />
-            <ActionTile label="Weather" description="Weather alerts" onPress={() => navigation.navigate("WeatherAlerts")} />
-            <ActionTile label="Profile" description="Supplier profile" onPress={() => navigation.navigate("SupplierProfile")} />
-            <ActionTile label="Market Insights" description="Analytics & trends" onPress={() => navigation.navigate("MarketInsights")} />
-            {/* Added a placeholder tile to complete the grid layout */}
-            <ActionTile label="Support" description="Contact helpdesk" onPress={() => console.log('Support')} /> 
+            <ActionTile iconKey="Orders" label={t.orders} description={t.ordersDesc} onPress={() => navigation.navigate("OrderManagement")} />
+            <ActionTile iconKey="Products" label={t.products} description={t.productsDesc} onPress={() => navigation.navigate("ProductManagement")} />
+            <ActionTile iconKey="Weather" label={t.weather} description={t.weatherDesc} onPress={() => navigation.navigate("WeatherAlerts")} />
+            <ActionTile iconKey="Profile" label={t.profile} description={t.profileDesc} onPress={() => navigation.navigate("SupplierProfile")} />
+            <ActionTile iconKey="Market Insights" label={t.marketInsights} description={t.marketInsightsDesc} onPress={() => navigation.navigate("MarketInsights")} />
+            <ActionTile iconKey="Support" label={t.support} description={t.supportDesc} onPress={() => console.log('Support')} /> 
         </View>
         
       </ScrollView>
@@ -263,6 +274,20 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "bold",
     color: COLORS.surface,
+    flex: 1,
+    textAlign: 'center',
+  },
+  languageButton: {
+    padding: 8,
+    paddingHorizontal: 12,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.md,
+    marginRight: 10,
+  },
+  languageText: {
+    color: COLORS.primaryDark,
+    fontSize: 14,
+    fontWeight: "700",
   },
   menuButton: {
     padding: 5,

@@ -3,6 +3,7 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { StatusBar } from "expo-status-bar";
 import { AuthProvider } from "./src/context/AuthContext";
+import { LanguageProvider } from "./src/context/LanguageContext";
 import LandingScreen from "./src/screens/LandingScreen";
 import AuthScreen from "./src/screens/AuthScreen";
 import FarmerDashboardScreen from "./src/screens/FarmerDashboardScreen";
@@ -33,7 +34,8 @@ const Stack = createNativeStackNavigator();
 export default function App() {
   return (
     <AuthProvider>
-      <NavigationContainer>
+      <LanguageProvider>
+        <NavigationContainer>
         <StatusBar style="dark" />
         <Stack.Navigator initialRouteName="Landing">
           <Stack.Screen
@@ -158,6 +160,7 @@ export default function App() {
           />
         </Stack.Navigator>
       </NavigationContainer>
+      </LanguageProvider>
     </AuthProvider>
   );
 }

@@ -13,7 +13,9 @@ import {
 import { apiClient } from "../api/client";
 import { COLORS, SHADOWS, RADIUS } from "../styles/theme";
 import { Ionicons, Feather } from '@expo/vector-icons';
-import { DrawerActions } from '@react-navigation/native'; // For burger menu
+import { DrawerActions } from '@react-navigation/native';
+import { useLanguage } from "../context/LanguageContext";
+import { translations } from "../translations/translations";
 
 // --- Custom Components ---
 
@@ -37,10 +39,10 @@ const StatCard = ({ label, value, iconName, color }) => (
 );
 
 // ActionTile Component (Enhanced with Icons)
-const ActionTile = ({ label, description, onPress }) => (
+const ActionTile = ({ label, description, onPress, iconKey }) => (
   <TouchableOpacity style={styles.actionTile} onPress={onPress}>
     <Ionicons 
-      name={ACTION_ICONS[label] || 'cube-outline'} 
+      name={ACTION_ICONS[iconKey || label] || 'cube-outline'} 
       size={30} 
       color={COLORS.primaryDark} 
     />
@@ -52,6 +54,8 @@ const ActionTile = ({ label, description, onPress }) => (
 // --- Main Component ---
 
 export default function BuyerDashboardScreen({ navigation }) {
+  const { language, toggleLanguage } = useLanguage();
+  const t = translations[language].buyerDashboard;
   const [ordersCount, setOrdersCount] = useState(0);
   const [wishlistCount, setWishlistCount] = useState(0);
   const [cartCount, setCartCount] = useState(0);
@@ -116,15 +120,16 @@ export default function BuyerDashboardScreen({ navigation }) {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Loading buyer dashboard...</Text>
+        <Text style={styles.loadingText}>{t.loading}</Text>
       </View>
     );
   }
 
   if (error) {
+    const commonT = translations[language];
     return (
       <View style={styles.centered}>
-        <Text style={styles.errorTitle}>Error</Text>
+        <Text style={styles.errorTitle}>{commonT.error}</Text>
         <Text style={styles.errorText}>{error}</Text>
       </View>
     );
@@ -136,14 +141,14 @@ export default function BuyerDashboardScreen({ navigation }) {
       
       {/* --- Custom Header --- */}
       <View style={styles.header}>
-        {/* FIX: Re-added Menu Button with Drawer Action */}
-        {/* <TouchableOpacity 
-          onPress={() => navigation.dispatch(DrawerActions.openDrawer())}
-          style={styles.menuButton}
+        {/* Language Toggle Button */}
+        <TouchableOpacity 
+          onPress={toggleLanguage}
+          style={styles.languageButton}
         >
-          <Ionicons name="menu-outline" size={30} color={COLORS.surface} />
-        </TouchableOpacity> */}
-        <Text style={styles.headerTitle}>Buyer Dashboard</Text>
+          <Text style={styles.languageText}>{language === "en" ? "اردو" : "EN"}</Text>
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>{t.title}</Text>
         <TouchableOpacity 
           onPress={() => navigation.navigate("BuyerProfile")}
           style={styles.profileButton}
@@ -154,19 +159,19 @@ export default function BuyerDashboardScreen({ navigation }) {
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         
-        <Text style={styles.welcomeText}>Your Activity Snapshot</Text>
+        <Text style={styles.welcomeText}>{t.welcome}</Text>
 
         {/* --- Stats Cards --- */}
         <View style={styles.cardSection}>
             <View style={styles.cardRow}>
                 <StatCard 
-                    label="Total Orders" 
+                    label={t.totalOrders} 
                     value={ordersCount} 
                     iconName="receipt-outline"
                     color={COLORS.surface}
                 />
                 <StatCard 
-                    label="Wishlist Items" 
+                    label={t.wishlistItems} 
                     value={wishlistCount} 
                     iconName="heart-outline"
                     color={COLORS.surface}
@@ -174,7 +179,7 @@ export default function BuyerDashboardScreen({ navigation }) {
             </View>
             <View style={styles.cardRow}>
                 <StatCard 
-                    label="Items in Cart" 
+                    label={t.itemsInCart} 
                     value={cartCount} 
                     iconName="cart-outline"
                     color={COLORS.surface}
@@ -184,7 +189,7 @@ export default function BuyerDashboardScreen({ navigation }) {
         </View>
 
         {/* --- Recent Orders Section --- */}
-        <Text style={styles.sectionTitle}>Recent Orders</Text>
+        <Text style={styles.sectionTitle}>{t.recentOrders}</Text>
         <View style={styles.recentOrdersContainer}>
             {recentOrders.length > 0 ? (
                 recentOrders.map((order) => {
@@ -193,7 +198,6 @@ export default function BuyerDashboardScreen({ navigation }) {
                         <TouchableOpacity
                             key={order._id}
                             style={styles.orderItem}
-                            // FIX: Navigate to OrderDetail with orderId
                             onPress={() => navigation.navigate("OrderDetail", { orderId: order._id })}
                         >
                             <Feather name="package" size={18} color={COLORS.primaryDark} />
@@ -222,12 +226,12 @@ export default function BuyerDashboardScreen({ navigation }) {
                     );
                 })
             ) : (
-                <Text style={styles.noDataText}>No recent orders found.</Text>
+                <Text style={styles.noDataText}>{t.noRecentOrders}</Text>
             )}
         </View>
 
         {/* --- Recommended Products Section --- */}
-        <Text style={styles.sectionTitle}>Recommended for You</Text>
+        <Text style={styles.sectionTitle}>{t.recommendedForYou}</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginBottom: 20}}>
             {recommendedProducts.length > 0 ? (
                 recommendedProducts.map((product) => (
@@ -247,20 +251,19 @@ export default function BuyerDashboardScreen({ navigation }) {
                     </TouchableOpacity>
                 ))
             ) : (
-                <Text style={styles.noDataText}>No recommended products found.</Text>
+                <Text style={styles.noDataText}>{t.noRecommendedProducts}</Text>
             )}
         </ScrollView>
 
         {/* --- Quick Actions Grid --- */}
-        <Text style={styles.sectionTitle}>Quick Access</Text>
+        <Text style={styles.sectionTitle}>{t.quickAccess}</Text>
         <View style={styles.actionsGrid}>
-            <ActionTile label="Browse Products" description="View marketplace" onPress={() => navigation.navigate("BuyerProducts")} />
-            <ActionTile label="My Cart" description="Checkout items" onPress={() => navigation.navigate("BuyerCart")} />
-            {/* FIX: Ensure this tile navigates to the MyOrders list screen */}
-            <ActionTile label="My Orders" description="Order history" onPress={() => navigation.navigate("MyOrders")} /> 
-            <ActionTile label="Wishlist" description="Saved products" onPress={() => navigation.navigate("Wishlist")} />
-            <ActionTile label="Profile" description="Buyer profile" onPress={() => navigation.navigate("BuyerProfile")} />
-            <ActionTile label="Market Insights" description="View trends" onPress={() => navigation.navigate("MarketInsights")} />
+            <ActionTile iconKey="Browse Products" label={t.browseProducts} description={t.browseProductsDesc} onPress={() => navigation.navigate("BuyerProducts")} />
+            <ActionTile iconKey="My Cart" label={t.myCart} description={t.myCartDesc} onPress={() => navigation.navigate("BuyerCart")} />
+            <ActionTile iconKey="My Orders" label={t.myOrders} description={t.myOrdersDesc} onPress={() => navigation.navigate("MyOrders")} /> 
+            <ActionTile iconKey="Wishlist" label={t.wishlist} description={t.wishlistDesc} onPress={() => navigation.navigate("Wishlist")} />
+            <ActionTile iconKey="Profile" label={t.profile} description={t.profileDesc} onPress={() => navigation.navigate("BuyerProfile")} />
+            <ActionTile iconKey="Market Insights" label={t.marketInsights} description={t.marketInsightsDesc} onPress={() => navigation.navigate("MarketInsights")} />
         </View>
         
       </ScrollView>
@@ -291,6 +294,20 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "bold",
     color: COLORS.surface,
+    flex: 1,
+    textAlign: 'center',
+  },
+  languageButton: {
+    padding: 8,
+    paddingHorizontal: 12,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.md,
+    marginRight: 10,
+  },
+  languageText: {
+    color: COLORS.primaryDark,
+    fontSize: 14,
+    fontWeight: "700",
   },
   menuButton: {
     padding: 5,

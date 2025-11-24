@@ -265,8 +265,9 @@ import {
 import { apiClient } from "../api/client";
 import { COLORS, SHADOWS, RADIUS } from "../styles/theme";
 import { Ionicons } from '@expo/vector-icons'; 
-// *** FIX: Import DrawerActions ***
-import { DrawerActions } from '@react-navigation/native'; 
+import { DrawerActions } from '@react-navigation/native';
+import { useLanguage } from "../context/LanguageContext";
+import { translations } from "../translations/translations"; 
 
 // --- Icon Mapping for Action Tiles ---
 const ACTION_ICONS = {
@@ -293,10 +294,10 @@ const StatCard = ({ label, value, iconName, color, style }) => (
 );
 
 // ActionTile Component (Enhanced with Icons)
-const ActionTile = ({ label, description, onPress }) => (
+const ActionTile = ({ label, description, onPress, iconKey }) => (
   <TouchableOpacity style={styles.actionTile} onPress={onPress}>
     <Ionicons 
-      name={ACTION_ICONS[label] || 'bookmark-outline'} 
+      name={ACTION_ICONS[iconKey || label] || 'bookmark-outline'} 
       size={30} 
       color={COLORS.primary} 
     />
@@ -308,6 +309,8 @@ const ActionTile = ({ label, description, onPress }) => (
 // --- Main Component ---
 
 export default function FarmerDashboardScreen({ navigation }) {
+  const { language, toggleLanguage } = useLanguage();
+  const t = translations[language].farmerDashboard;
   const [activeOrdersCount, setActiveOrdersCount] = useState(0);
   const [productsCount, setProductsCount] = useState(0);
   const [revenue, setRevenue] = useState(0);
@@ -361,7 +364,7 @@ export default function FarmerDashboardScreen({ navigation }) {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Loading dashboard...</Text>
+        <Text style={styles.loadingText}>{t.loading}</Text>
       </View>
     );
   }
@@ -380,15 +383,15 @@ export default function FarmerDashboardScreen({ navigation }) {
       
       {/* --- Custom Header --- */}
       <View style={styles.header}>
-        {/* FIX: Menu Button using dispatch */}
-        {/* <TouchableOpacity 
-          onPress={() => navigation.dispatch(DrawerActions.openDrawer())}
-          style={styles.menuButton}
+        {/* Language Toggle Button */}
+        <TouchableOpacity 
+          onPress={toggleLanguage}
+          style={styles.languageButton}
         >
-          <Ionicons name="menu-outline" size={30} color={COLORS.surface} />
-        </TouchableOpacity> */}
+          <Text style={styles.languageText}>{language === "en" ? "اردو" : "EN"}</Text>
+        </TouchableOpacity>
         
-        <Text style={styles.headerTitle}>Farmer Console</Text>
+        <Text style={styles.headerTitle}>{t.title}</Text>
         
         {/* Profile Button to navigate */}
         <TouchableOpacity 
@@ -401,12 +404,12 @@ export default function FarmerDashboardScreen({ navigation }) {
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         
-        <Text style={styles.welcomeText}>Welcome back to the market!</Text>
+        <Text style={styles.welcomeText}>{t.welcome}</Text>
 
         {/* --- Stats Cards (Enhanced) --- */}
         <View style={styles.cardSection}>
           <StatCard 
-            label="Active Orders" 
+            label={t.activeOrders} 
             value={activeOrdersCount} 
             iconName="pricetags-outline"
             color={COLORS.primary}
@@ -414,13 +417,13 @@ export default function FarmerDashboardScreen({ navigation }) {
           />
           <View style={styles.cardRow}>
             <StatCard 
-              label="My Products" 
+              label={t.myProducts} 
               value={productsCount} 
               iconName="cube-outline"
               color={COLORS.primaryDark}
             />
             <StatCard 
-              label={`Revenue (${new Date().toLocaleString('default', { month: 'short' })})`} 
+              label={`${t.revenue} (${new Date().toLocaleString('default', { month: 'short' })})`} 
               value={`Rs ${revenue.toLocaleString()}`} 
               iconName="cash-outline"
               color={COLORS.success}
@@ -429,16 +432,16 @@ export default function FarmerDashboardScreen({ navigation }) {
         </View>
 
         {/* --- Quick Actions Grid (Enhanced) --- */}
-        <Text style={styles.sectionTitle}>Quick Actions</Text>
+        <Text style={styles.sectionTitle}>{t.quickActions}</Text>
         <View style={styles.actionsGrid}>
-          <ActionTile label="Manage Products" description="View/Edit stock" onPress={() => navigation.navigate("FarmerProducts")} />
-          <ActionTile label="My Products" description="Add new listings" onPress={() => navigation.navigate("ProductManagement")} />
-          <ActionTile label="Orders" description="Pending shipments" onPress={() => navigation.navigate("OrderManagement")} />
-          <ActionTile label="My Orders" description="View my history" onPress={() => navigation.navigate("MyOrders")} />
-          <ActionTile label="Wishlist" description="Saved supplies" onPress={() => navigation.navigate("Wishlist")} />
-          <ActionTile label="Weather" description="Local alerts" onPress={() => navigation.navigate("WeatherAlerts")} />
-          <ActionTile label="Profile" description="Update details" onPress={() => navigation.navigate("FarmerProfile")} />
-          <ActionTile label="Cart" description="Review items" onPress={() => navigation.navigate("ShoppingCart")} />
+          <ActionTile iconKey="Manage Products" label={t.manageProducts} description={t.manageProductsDesc} onPress={() => navigation.navigate("FarmerProducts")} />
+          <ActionTile iconKey="My Products" label={t.myProductsLabel} description={t.myProductsDesc} onPress={() => navigation.navigate("ProductManagement")} />
+          <ActionTile iconKey="Orders" label={t.orders} description={t.ordersDesc} onPress={() => navigation.navigate("OrderManagement")} />
+          <ActionTile iconKey="My Orders" label={t.myOrders} description={t.myOrdersDesc} onPress={() => navigation.navigate("MyOrders")} />
+          <ActionTile iconKey="Wishlist" label={t.wishlist} description={t.wishlistDesc} onPress={() => navigation.navigate("Wishlist")} />
+          <ActionTile iconKey="Weather" label={t.weather} description={t.weatherDesc} onPress={() => navigation.navigate("WeatherAlerts")} />
+          <ActionTile iconKey="Profile" label={t.profile} description={t.profileDesc} onPress={() => navigation.navigate("FarmerProfile")} />
+          <ActionTile iconKey="Cart" label={t.cart} description={t.cartDesc} onPress={() => navigation.navigate("ShoppingCart")} />
         </View>
         
       </ScrollView>
@@ -469,6 +472,20 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "bold",
     color: COLORS.surface,
+    flex: 1,
+    textAlign: 'center',
+  },
+  languageButton: {
+    padding: 8,
+    paddingHorizontal: 12,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.md,
+    marginRight: 10,
+  },
+  languageText: {
+    color: COLORS.primaryDark,
+    fontSize: 14,
+    fontWeight: "700",
   },
   menuButton: {
     padding: 5,
