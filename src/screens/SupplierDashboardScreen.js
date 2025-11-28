@@ -15,6 +15,7 @@ import { Ionicons, Feather } from '@expo/vector-icons';
 import { DrawerActions } from '@react-navigation/native';
 import { useLanguage } from "../context/LanguageContext";
 import { translations } from "../translations/translations";
+import ChatBotButton from "../components/ChatBotButton";
 
 // --- Custom Components ---
 
@@ -187,13 +188,13 @@ export default function SupplierDashboardScreen({ navigation }) {
                     color={COLORS.surface}
                 />
                 {/* Mocked Weather Status Card */}
-                <StatCard 
+                {/* <StatCard 
                     label={t.weatherStatus} 
                     value="Optimal" 
                     subtitle="30°C / Light Wind" 
                     iconName="cloudy-night-outline"
                     color={COLORS.surface}
-                />
+                /> */}
             </View>
         </View>
 
@@ -207,7 +208,7 @@ export default function SupplierDashboardScreen({ navigation }) {
                         <TouchableOpacity
                             key={order._id}
                             style={styles.orderItem}
-                            onPress={() => navigation.navigate("OrderDetail", { orderId: order._id })}
+                            onPress={() => navigation.navigate("OrderManagement", { orderId: order._id })}
                         >
                             <Feather name="truck" size={18} color={COLORS.primaryDark} />
                             <View style={styles.orderInfo}>
@@ -246,11 +247,14 @@ export default function SupplierDashboardScreen({ navigation }) {
             <ActionTile iconKey="Products" label={t.products} description={t.productsDesc} onPress={() => navigation.navigate("ProductManagement")} />
             <ActionTile iconKey="Weather" label={t.weather} description={t.weatherDesc} onPress={() => navigation.navigate("WeatherAlerts")} />
             <ActionTile iconKey="Profile" label={t.profile} description={t.profileDesc} onPress={() => navigation.navigate("SupplierProfile")} />
-            <ActionTile iconKey="Market Insights" label={t.marketInsights} description={t.marketInsightsDesc} onPress={() => navigation.navigate("MarketInsights")} />
-            <ActionTile iconKey="Support" label={t.support} description={t.supportDesc} onPress={() => console.log('Support')} /> 
+            {/* <ActionTile iconKey="Market Insights" label={t.marketInsights} description={t.marketInsightsDesc} onPress={() => navigation.navigate("MarketInsights")} />
+            <ActionTile iconKey="Support" label={t.support} description={t.supportDesc} onPress={() => console.log('Support')} />  */}
         </View>
         
       </ScrollView>
+      
+      {/* ChatBot Button */}
+      <ChatBotButton onPress={() => navigation.navigate("ChatBot")} />
     </SafeAreaView>
   );
 }

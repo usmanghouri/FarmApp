@@ -16,6 +16,7 @@ import { Ionicons, Feather } from '@expo/vector-icons';
 import { DrawerActions } from '@react-navigation/native';
 import { useLanguage } from "../context/LanguageContext";
 import { translations } from "../translations/translations";
+import ChatBotButton from "../components/ChatBotButton";
 
 // --- Custom Components ---
 
@@ -263,10 +264,13 @@ export default function BuyerDashboardScreen({ navigation }) {
             <ActionTile iconKey="My Orders" label={t.myOrders} description={t.myOrdersDesc} onPress={() => navigation.navigate("MyOrders")} /> 
             <ActionTile iconKey="Wishlist" label={t.wishlist} description={t.wishlistDesc} onPress={() => navigation.navigate("Wishlist")} />
             <ActionTile iconKey="Profile" label={t.profile} description={t.profileDesc} onPress={() => navigation.navigate("BuyerProfile")} />
-            <ActionTile iconKey="Market Insights" label={t.marketInsights} description={t.marketInsightsDesc} onPress={() => navigation.navigate("MarketInsights")} />
+            {/* <ActionTile iconKey="Market Insights" label={t.marketInsights} description={t.marketInsightsDesc} onPress={() => navigation.navigate("MarketInsights")} /> */}
         </View>
         
       </ScrollView>
+      
+      {/* ChatBot Button */}
+      <ChatBotButton onPress={() => navigation.navigate("ChatBot")} />
     </SafeAreaView>
   );
 }

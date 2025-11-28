@@ -36,7 +36,18 @@ const PAYMENT_METHODS = [
     { key: "jazzcash", name: "JazzCash" },
 ];
 
-export default function ShoppingCartScreen({ navigation }) {
+export default function ShoppingCartScreen({ navigation, route, overrides = {} }) {
+  const config = {
+    headingText: "Your Shopping Cart",
+    browseRoute: "FarmerProducts",
+    browseLabel: "Browse Products",
+    continueShoppingRoute: "FarmerProducts",
+    continueShoppingLabel: "Continue Shopping",
+    emptyCtaLabel: "Browse Products",
+    emptyMessage: "Add items from the marketplace to get started.",
+    ...route?.params,
+    ...overrides
+  };
   const [cartItems, setCartItems] = useState([]);
   const [cartId, setCartId] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -214,7 +225,7 @@ export default function ShoppingCartScreen({ navigation }) {
     >
         <View style={styles.container}>
             <View style={styles.headerRow}>
-                <Text style={styles.heading}>Your Shopping Cart</Text>
+                <Text style={styles.heading}>{config.headingText}</Text>
                 {cartItems.length > 0 && (
                     <TouchableOpacity style={styles.clearButton} onPress={clearCart}>
                          <Feather name="trash-2" size={14} color={COLORS.danger} />
@@ -234,13 +245,13 @@ export default function ShoppingCartScreen({ navigation }) {
                     <Ionicons name="cart-outline" size={48} color={COLORS.muted} style={{marginBottom: 10}}/>
                     <Text style={styles.emptyTitle}>Your cart is empty</Text>
                     <Text style={styles.emptyText}>
-                        Add items from the marketplace to get started.
+                        {config.emptyMessage}
                     </Text>
                     <TouchableOpacity
                         style={styles.primaryButton}
-                        onPress={() => navigation?.navigate?.("FarmerProducts")}
+                        onPress={() => navigation?.navigate?.(config.browseRoute)}
                     >
-                        <Text style={styles.primaryButtonText}>Browse Products</Text>
+                        <Text style={styles.primaryButtonText}>{config.emptyCtaLabel}</Text>
                     </TouchableOpacity>
                 </View>
             ) : (
@@ -319,9 +330,9 @@ export default function ShoppingCartScreen({ navigation }) {
                         </TouchableOpacity>
                         <TouchableOpacity
                             style={styles.secondaryButton}
-                            onPress={() => navigation?.navigate?.("FarmerProducts")}
+                            onPress={() => navigation?.navigate?.(config.continueShoppingRoute)}
                         >
-                            <Text style={styles.secondaryButtonText}>Continue Shopping</Text>
+                            <Text style={styles.secondaryButtonText}>{config.continueShoppingLabel}</Text>
                         </TouchableOpacity>
                     </View>
                 </>

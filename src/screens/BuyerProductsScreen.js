@@ -31,10 +31,11 @@ export default function BuyerProductsScreen({ navigation }) {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  // --- NEW STATE for Search and Filter ---
   const [searchTerm, setSearchTerm] = useState("");
-  const [activeCategory, setActiveCategory] = useState("all"); 
-  // --- End NEW STATE ---
+  const [activeCategory, setActiveCategory] = useState("all");
+  // ⭐ NEW STATE: Tracks wishlisted product IDs for local UI feedback
+  const [wishlistIds, setWishlistIds] = useState(new Set()); 
+  // Note: In a real app, this should be initialized with the user's actual wishlist on load.
 
   useEffect(() => {
     fetchProducts();
@@ -55,76 +56,138 @@ export default function BuyerProductsScreen({ navigation }) {
 
   const handleAddToCart = async (productId) => {
     try {
-      await apiClient.post("/api/cart/add-item", { productId, quantity: 1 }, { withCredentials: true });
+      await apiClient.post(
+        "/api/cart/add",
+        { productId, quantity: 1 },
+        { withCredentials: true }
+      );
       Alert.alert("Success", "Product added to cart!");
     } catch (err) {
       console.error("Failed to add to cart:", err);
       Alert.alert("Error", err.response?.data?.message || "Failed to add to cart.");
     }
   };
+
+  const handleAddToWishlist = async (productId) => {
+    const isCurrentlyWishlisted = wishlistIds.has(productId);
+
+    if (isCurrentlyWishlisted) {
+      // ⭐ REMOVE LOGIC: Optimistic UI update for immediate feedback
+      setWishlistIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(productId);
+        return newSet;
+      });
+      Alert.alert("Success", "Product removed from wishlist!");
+
+      // Note: In a production app, you would call the REMOVE API here:
+      // try { await apiClient.delete("/api/wishlist/remove", { data: { productId } }); } 
+      // catch (err) { // Revert state on error }
+
+    } else {
+      // ⭐ ADD LOGIC: Call API and update state on success
+      try {
+        await apiClient.post(
+          "/api/wishlist/add",
+          { productId },
+          { withCredentials: true }
+        );
+        
+        // Update local state on API success
+        setWishlistIds(prev => new Set(prev).add(productId));
+        Alert.alert("Success", "Product added to wishlist!");
+      } catch (err) {
+        console.error("Failed to add to wishlist:", err);
+        Alert.alert("Error", err.response?.data?.message || "Failed to add to wishlist.");
+      }
+    }
+  };
   
-  // --- NEW: Filtered Products Logic ---
+  // --- Filtered Products Logic ---
   const filteredProducts = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
     return products.filter((product) => {
-        const name = product.name?.toLowerCase() || "";
-        const description = product.description?.toLowerCase() || "";
-        const category = product.category?.toLowerCase() || "";
+      const name = product.name?.toLowerCase() || "";
+      const description = product.description?.toLowerCase() || "";
+      const category = product.category?.toLowerCase() || "";
 
-        const matchesSearch =
-            name.includes(term) ||
-            description.includes(term) ||
-            category.includes(term);
+      const matchesSearch =
+        name.includes(term) ||
+        description.includes(term) ||
+        category.includes(term);
 
-        const matchesCategory =
-            activeCategory === "all" || category.includes(activeCategory.toLowerCase());
+      const matchesCategory =
+        activeCategory === "all" || category.includes(activeCategory.toLowerCase());
 
-        return matchesSearch && matchesCategory;
+      return matchesSearch && matchesCategory;
     });
   }, [products, searchTerm, activeCategory]);
-  // --- End NEW Logic ---
+  // --- End Filtered Products Logic ---
 
-  const renderProduct = ({ item }) => (
-    <TouchableOpacity
-      style={[styles.productCard, !item.isAvailable && styles.cardUnavailable]}
-      onPress={() => navigation.navigate("ProductDetail", { productId: item._id })}
-      disabled={!item.isAvailable}
-    >
-      <View style={styles.imageWrapper}>
+  const renderProduct = ({ item }) => {
+    // ⭐ Check the wishlist state
+    const isWishlisted = wishlistIds.has(item._id);
+
+    return (
+      <TouchableOpacity
+        style={[styles.productCard, !item.isAvailable && styles.cardUnavailable]}
+        onPress={() => navigation.navigate("ProductDetail", { productId: item._id })}
+        disabled={!item.isAvailable}
+      >
+        <View style={styles.imageWrapper}>
           <Image 
             source={{ uri: item.images?.[0] || "https://via.placeholder.com/150" }} 
             style={styles.productImage} 
           />
+          
+          {/* ⭐ Wishlist Button with Conditional Styling */}
+          <TouchableOpacity
+            style={styles.wishlistButton}
+            onPress={(e) => {
+              e.stopPropagation(); // Prevent card navigation when button is pressed
+              handleAddToWishlist(item._id);
+            }}
+          >
+            <Ionicons 
+              // Change icon shape (filled vs. outline)
+              name={isWishlisted ? "heart-sharp" : "heart-outline"} 
+              size={22} 
+              // Change icon color (danger/red vs. primary/green)
+              color={isWishlisted ? COLORS.danger : COLORS.primary} 
+            />
+          </TouchableOpacity>
+          {/* ⭐ End Conditional Wishlist Button */}
+
           {!item.isAvailable && (
-              <View style={styles.stockOverlay}>
-                  <Text style={styles.stockOverlayText}>OUT OF STOCK</Text>
-              </View>
+            <View style={styles.stockOverlay}>
+                <Text style={styles.stockOverlayText}>OUT OF STOCK</Text>
+            </View>
           )}
-      </View>
-      
-      <View style={styles.productInfo}>
-        {/* Changed name line clamping for visual consistency */}
-        <Text style={styles.productName} numberOfLines={2}>{item.name}</Text> 
-        <Text style={styles.productCategory}>
-            {item.category} | {item.unit}
-        </Text>
-        <Text style={styles.productPrice}>₨ {item.price.toLocaleString()}</Text>
+        </View>
         
-        <TouchableOpacity 
+        <View style={styles.productInfo}>
+          <Text style={styles.productName} numberOfLines={2}>{item.name}</Text> 
+          <Text style={styles.productCategory}>
+              {item.category} | {item.unit}
+          </Text>
+          <Text style={styles.productPrice}>₨ {item.price.toLocaleString()}</Text>
+          
+          <TouchableOpacity 
             style={[styles.addToCartButton, !item.isAvailable && styles.disabledButton]} 
             onPress={(e) => {
-                e.stopPropagation(); // Prevent card navigation when button is pressed
-                handleAddToCart(item._id);
+              e.stopPropagation();
+              handleAddToCart(item._id);
             }}
             disabled={!item.isAvailable}
-        >
-          <Text style={styles.addToCartButtonText}>
-            {item.isAvailable ? "Add to Cart" : "Unavailable"}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </TouchableOpacity>
-  );
+          >
+            <Text style={styles.addToCartButtonText}>
+              {item.isAvailable ? "Add to Cart" : "Unavailable"}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   if (loading) {
     return (
@@ -147,24 +210,24 @@ export default function BuyerProductsScreen({ navigation }) {
     <View style={styles.container}>
       <Text style={styles.heading}>Marketplace</Text>
       
-      {/* --- NEW: Search Bar --- */}
+      {/* --- Search Bar --- */}
       <View style={styles.searchContainer}>
         <Feather name="search" size={20} color={COLORS.muted} style={styles.searchIcon} />
         <TextInput
-            placeholder="Search products, category, or seller..."
-            placeholderTextColor={COLORS.muted}
-            value={searchTerm}
-            onChangeText={setSearchTerm}
-            style={styles.searchInput}
+          placeholder="Search products, category, or seller..."
+          placeholderTextColor={COLORS.muted}
+          value={searchTerm}
+          onChangeText={setSearchTerm}
+          style={styles.searchInput}
         />
       </View>
       
-      {/* --- NEW: Category Chips --- */}
+      {/* --- Category Chips --- */}
       <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false}
-          style={styles.categoryRowScroll}
-          contentContainerStyle={styles.categoryRowContainer}
+        horizontal 
+        showsHorizontalScrollIndicator={false}
+        style={styles.categoryRowScroll}
+        contentContainerStyle={styles.categoryRowContainer}
       >
         {CATEGORIES.map(cat => (
           <TouchableOpacity
@@ -211,7 +274,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
-    backgroundColor: '#F0FFF0', // Soft green background
+    backgroundColor: '#F0FFF0',
   },
   heading: {
     fontSize: 26,
@@ -239,20 +302,21 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: COLORS.mutedDark,
   },
-  // --- Category Chips ---
+  // --- Category Chips (IMPROVED STYLES) ---
   categoryRowScroll: {
-      maxHeight: 45,
-      marginBottom: 16,
+    height: 50, 
+    marginBottom: 16,
   },
   categoryRowContainer: {
-      paddingHorizontal: 5,
+    paddingHorizontal: 16,
+    alignItems: 'center',
   },
   categoryChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     borderRadius: RADIUS.pill,
-    backgroundColor: COLORS.border, 
-    marginRight: 10,
+    backgroundColor: COLORS.surface,
+    marginRight: 12,
     borderWidth: 1,
     borderColor: COLORS.border,
   },
@@ -261,7 +325,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.primary,
   },
   categoryText: {
-    fontSize: 13,
+    fontSize: 14,
     color: COLORS.mutedDark,
     fontWeight: '600',
   },
@@ -277,21 +341,34 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.lg,
     overflow: "hidden",
     ...SHADOWS.card,
-    borderBottomWidth: 3,
-    borderColor: COLORS.accent, 
+    borderBottomWidth: 4,
+    borderColor: COLORS.primary, 
   },
   cardUnavailable: {
-    opacity: 0.6,
+    opacity: 0.7,
     borderColor: COLORS.danger,
   },
   imageWrapper: {
     position: 'relative',
+    width: "100%",
+    height: 160,
   },
   productImage: {
     width: "100%",
-    height: 160,
+    height: "100%", 
     resizeMode: "cover",
     backgroundColor: COLORS.background,
+  },
+  // ⭐ Wishlist Button (UPDATED)
+  wishlistButton: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    padding: 6,
+    borderRadius: RADIUS.circle,
+    backgroundColor: COLORS.surface,
+    ...SHADOWS.card,
+    zIndex: 10,
   },
   stockOverlay: {
     position: 'absolute',
@@ -302,6 +379,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 5,
   },
   stockOverlayText: {
     color: COLORS.surface,
@@ -315,21 +393,21 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   productName: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: "700",
     color: COLORS.primaryDark,
-    marginBottom: 6,
+    marginBottom: 4, 
     minHeight: 40, 
   },
   productCategory: {
     fontSize: 13,
     color: COLORS.muted,
-    marginBottom: 4,
+    marginBottom: 8,
   },
   productPrice: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: "800",
-    color: COLORS.primary,
+    color: COLORS.success,
     marginBottom: 12,
   },
   addToCartButton: {
@@ -370,6 +448,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.primaryDark,
     marginTop: 10,
+  },
+  emptyText: {
+    color: COLORS.muted,
   },
   centered: {
     flex: 1,

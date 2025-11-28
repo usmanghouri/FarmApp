@@ -264,10 +264,20 @@ import {
 } from "react-native";
 import { apiClient } from "../api/client";
 import { COLORS, SHADOWS, RADIUS } from "../styles/theme";
-import { Ionicons } from '@expo/vector-icons'; 
+import { Ionicons, Feather } from '@expo/vector-icons'; 
 import { DrawerActions } from '@react-navigation/native';
 import { useLanguage } from "../context/LanguageContext";
-import { translations } from "../translations/translations"; 
+import { translations } from "../translations/translations";
+import ChatBotButton from "../components/ChatBotButton";
+
+// Utility to map order status to color
+const getStatusColor = (status) => {
+  const s = status?.toLowerCase();
+  if (s === 'delivered') return { bg: COLORS.success, text: COLORS.surface };
+  if (s === 'shipped') return { bg: COLORS.info, text: COLORS.surface };
+  if (s === 'canceled' || s === 'cancelled') return { bg: COLORS.danger, text: COLORS.surface };
+  return { bg: COLORS.warning, text: COLORS.primaryDark };
+};
 
 // --- Icon Mapping for Action Tiles ---
 const ACTION_ICONS = {
@@ -314,6 +324,7 @@ export default function FarmerDashboardScreen({ navigation }) {
   const [activeOrdersCount, setActiveOrdersCount] = useState(0);
   const [productsCount, setProductsCount] = useState(0);
   const [revenue, setRevenue] = useState(0);
+  const [recentOrders, setRecentOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -329,7 +340,10 @@ export default function FarmerDashboardScreen({ navigation }) {
 
         const orders = ordersResponse.data?.orders || [];
         const activeCount = orders.filter(o => o.status !== "delivered" && o.status !== "cancelled").length;
-        setActiveOrdersCount(activeCount); 
+        setActiveOrdersCount(activeCount);
+        
+        // Set recent orders (first 3)
+        setRecentOrders(orders.slice(0, 3)); 
 
         const now = new Date();
         const currentMonth = now.getMonth();
@@ -431,6 +445,38 @@ export default function FarmerDashboardScreen({ navigation }) {
           </View>
         </View>
 
+        {/* --- Recent Orders Section --- */}
+        <Text style={styles.sectionTitle}>Recent Orders</Text>
+        <View style={styles.recentOrdersContainer}>
+          {recentOrders.length > 0 ? (
+            recentOrders.map((order) => {
+              const statusStyle = getStatusColor(order.status);
+              return (
+                <TouchableOpacity
+                  key={order._id}
+                  style={styles.orderItem}
+                  onPress={() => navigation.navigate("OrderDetail", { orderId: order._id })}
+                >
+                  <Feather name="package" size={18} color={COLORS.primaryDark} />
+                  <View style={styles.orderInfo}>
+                    <Text style={styles.orderId}>Order #{order._id?.slice(-6).toUpperCase()}</Text>
+                    <Text style={styles.orderMeta}>
+                      {order.products?.length || 0} item{order.products?.length !== 1 ? "s" : ""} | {new Date(order.createdAt).toLocaleDateString()}
+                    </Text>
+                  </View>
+                  <View style={[styles.orderStatusBadge, { backgroundColor: statusStyle.bg }]}>
+                    <Text style={[styles.orderStatusText, { color: statusStyle.text }]}>
+                      {order.status}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })
+          ) : (
+            <Text style={styles.noDataText}>No recent orders found.</Text>
+          )}
+        </View>
+
         {/* --- Quick Actions Grid (Enhanced) --- */}
         <Text style={styles.sectionTitle}>{t.quickActions}</Text>
         <View style={styles.actionsGrid}>
@@ -445,6 +491,9 @@ export default function FarmerDashboardScreen({ navigation }) {
         </View>
         
       </ScrollView>
+      
+      {/* ChatBot Button */}
+      <ChatBotButton onPress={() => navigation.navigate("ChatBot")} />
     </SafeAreaView>
   );
 }
@@ -591,6 +640,53 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontSize: 16,
     paddingHorizontal: 20,
+  },
+  // --- Recent Orders ---
+  recentOrdersContainer: {
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.lg,
+    paddingHorizontal: 16,
+    marginBottom: 20,
+    ...SHADOWS.soft,
+  },
+  orderItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+    gap: 10,
+  },
+  orderInfo: {
+    flex: 1,
+    marginLeft: 10,
+  },
+  orderId: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: COLORS.primaryDark,
+    marginBottom: 2,
+  },
+  orderMeta: {
+    fontSize: 13,
+    color: COLORS.muted,
+  },
+  orderStatusBadge: {
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: RADIUS.pill,
+  },
+  orderStatusText: {
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  noDataText: {
+    textAlign: "center",
+    color: COLORS.muted,
+    fontStyle: "italic",
+    paddingVertical: 10,
+    width: '100%',
   },
 });
 

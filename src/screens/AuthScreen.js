@@ -9,6 +9,7 @@ import {
   Alert,
   ScrollView
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { apiClient, API_BASE_URL } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import { COLORS, SHADOWS, RADIUS } from "../styles/theme";
@@ -40,6 +41,7 @@ export default function AuthScreen({ navigation }) {
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 const [error, setError] = useState(null);
+const [showPassword, setShowPassword] = useState(false);
 
   const onChangeField = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -57,7 +59,7 @@ const [error, setError] = useState(null);
 
     if (step === "reset") {
       if (!newPassword || newPassword.length < 6) {
-        setErrorMessage("Password must be at least 6 characters");
+        setErrorMessage("Password must be at least 8 characters");
         return false;
       }
       if (!otp || otp.length !== 6) {
@@ -116,15 +118,9 @@ const [error, setError] = useState(null);
       const data = response.data || {};
 
       if (isSignup) {
-        if (data.requiresOTP) {
-          setSuccessMessage("Account created. Please verify your email with OTP.");
-          setStep("otp");
-        } else {
-          // This case might not be reached if all signups require OTP
-          setSuccessMessage("Account created successfully! Please sign in.");
-          setIsSignup(false);
-          setStep("auth");
-        }
+        // Always require email verification after signup (matching web version)
+        setSuccessMessage("✅ Registered successfully! Please verify your email.");
+        setStep("otp");
       } else {
         // Login success
         const roleKey =
@@ -226,12 +222,13 @@ const [error, setError] = useState(null);
         { email: formData.email, otp },
         { withCredentials: true }
       );
-      setSuccessMessage("Email verified! Please sign in.");
+      setSuccessMessage("✅ Email verified! Please log in.");
       setTimeout(() => {
         setStep("auth");
         setIsSignup(false);
         setOtp("");
-      }, 1000);
+        setFormData({ ...formData, password: "" }); // Clear password field
+      }, 1500);
     } catch (err) {
       const msg =
         err?.response?.data?.message || err.message || "OTP verification failed";
@@ -247,12 +244,23 @@ const [error, setError] = useState(null);
     setLoading(true);
     try {
       const apiBase = API_MAP[role];
-      await apiClient.post(
-        `${apiBase}/resend-otp`,
-        { email: formData.email },
-        { withCredentials: true }
-      );
-      setSuccessMessage("OTP resent successfully! Check your email.");
+      // Try both endpoint formats to match web version
+      try {
+        await apiClient.post(
+          `${apiBase}/resendOTP`,
+          { email: formData.email },
+          { withCredentials: true }
+        );
+        setSuccessMessage("📨 OTP resent to your email.");
+      } catch (err) {
+        // Fallback to alternative endpoint format
+        await apiClient.post(
+          `${apiBase}/resend-otp`,
+          { email: formData.email },
+          { withCredentials: true }
+        );
+        setSuccessMessage("📨 OTP resent to your email.");
+      }
     } catch (err) {
       const msg = err?.response?.data?.message || err.message || "Failed to resend OTP";
       setErrorMessage(msg);
@@ -274,7 +282,7 @@ const [error, setError] = useState(null);
           <TextInput
             value={formData.phone}
             onChangeText={v => onChangeField("phone", v)}
-            placeholder="Phone Number"
+            placeholder="+923xxxxxxxxx"
             style={styles.input}
             keyboardType="phone-pad"
           />
@@ -296,13 +304,30 @@ const [error, setError] = useState(null);
         style={styles.input}
       />
 
-      <TextInput
+      {/* <TextInput
         value={formData.password}
         onChangeText={v => onChangeField("password", v)}
         placeholder="Password"
         secureTextEntry
         style={styles.input}
-      />
+      /> */}
+      {/* 3. UPDATED PASSWORD FIELD WITH ICON */}
+      <View style={styles.passwordContainer}>
+        <TextInput
+          value={formData.password}
+          onChangeText={v => onChangeField("password", v)}
+          placeholder="Password"
+          secureTextEntry={!showPassword} 
+          style={styles.passwordInput}
+        />
+        <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+          <Ionicons 
+            name={showPassword ? "eye-off" : "eye"} 
+            size={24} 
+            color={COLORS.muted} 
+          />
+        </TouchableOpacity>
+      </View>
 
       {!isSignup && (
         <TouchableOpacity
@@ -353,15 +378,20 @@ const [error, setError] = useState(null);
     <View style={styles.formContainer}>
       <Text style={styles.formTitle}>Verify Your Email</Text>
       <Text style={styles.formSubtitle}>
-        Enter the 6-digit OTP sent to {formData.email}
+        We've sent a 6-digit code to {formData.email}
       </Text>
       <TextInput
         value={otp}
-        onChangeText={setOtp}
-        placeholder="Enter OTP"
+        onChangeText={(text) => {
+          // Only allow numeric input
+          const numericText = text.replace(/[^0-9]/g, '');
+          setOtp(numericText);
+        }}
+        placeholder="Enter 6-digit OTP"
         keyboardType="number-pad"
         maxLength={6}
         style={styles.input}
+        autoFocus={true}
       />
       {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
       {successMessage ? <Text style={styles.successText}>{successMessage}</Text> : null}
@@ -445,13 +475,30 @@ const [error, setError] = useState(null);
         maxLength={6}
         style={styles.input}
       />
-      <TextInput
+      {/* <TextInput
         value={newPassword}
         onChangeText={setNewPassword}
         placeholder="New Password (min 6 characters)"
         secureTextEntry
         style={styles.input}
-      />
+      /> */}
+      {/* Updated Reset Password Field with Icon logic as well */}
+      <View style={styles.passwordContainer}>
+        <TextInput
+          value={newPassword}
+          onChangeText={setNewPassword}
+          placeholder="New Password (min 6 characters)"
+          secureTextEntry={!showPassword}
+          style={styles.passwordInput}
+        />
+         <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+          <Ionicons 
+            name={showPassword ? "eye-off" : "eye"} 
+            size={24} 
+            color={COLORS.muted} 
+          />
+        </TouchableOpacity>
+      </View>
       {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
       {successMessage ? <Text style={styles.successText}>{successMessage}</Text> : null}
       <TouchableOpacity
@@ -712,6 +759,23 @@ const styles = StyleSheet.create({
   backButtonText: {
     color: COLORS.muted,
     fontSize: 14,
+  },
+  // 4. NEW STYLES FOR PASSWORD CONTAINER
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.md,
+    paddingHorizontal: 15,
+    marginBottom: 15,
+    backgroundColor: COLORS.background,
+  },
+  passwordInput: {
+    flex: 1,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: COLORS.mutedDark,
   },
 });
 

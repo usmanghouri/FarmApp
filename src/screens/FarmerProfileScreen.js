@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import { apiClient } from "../api/client";
 import { COLORS, SHADOWS, RADIUS } from "../styles/theme";
 
@@ -37,6 +38,7 @@ export default function FarmerProfileScreen({ navigation }) {
   const [isEditing, setIsEditing] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [banner, setBanner] = useState("");
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   const fetchProfile = async () => {
     try {
@@ -72,6 +74,71 @@ export default function FarmerProfileScreen({ navigation }) {
 
   const handleFormChange = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
   const handlePasswordChange = (key, value) => setPasswordForm((prev) => ({ ...prev, [key]: value }));
+
+  const pickImage = async () => {
+    try {
+      // Request permission
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+      if (!permissionResult.granted) {
+        Alert.alert("Permission Required", "Please allow access to your photo library to update profile picture.");
+        return;
+      }
+
+      // Launch image picker
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const selectedImage = result.assets[0];
+        await uploadImage(selectedImage.uri);
+      }
+    } catch (error) {
+      console.error("Image picker error:", error);
+      Alert.alert("Error", "Failed to pick image");
+    }
+  };
+
+  const uploadImage = async (uri) => {
+    try {
+      setUploadingImage(true);
+      
+      // Create form data
+      const uploadFormData = new FormData();
+      const filename = uri.split('/').pop();
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1]}` : 'image/jpeg';
+
+      uploadFormData.append('image', {
+        uri,
+        name: filename,
+        type,
+      });
+
+      // Upload to server
+      const response = await apiClient.post('/api/farmers/upload-image', uploadFormData, {
+        withCredentials: true,
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      if (response.data?.imageUrl) {
+        setForm((prev) => ({ ...prev, img: response.data.imageUrl }));
+        showBanner("Profile picture updated successfully!");
+        fetchProfile();
+      }
+    } catch (error) {
+      console.error("Image upload error:", error);
+      showBanner(error?.response?.data?.message || "Failed to upload image");
+    } finally {
+      setUploadingImage(false);
+    }
+  };
 
   const handleCancel = () => {
     setIsEditing(false);
@@ -191,14 +258,14 @@ export default function FarmerProfileScreen({ navigation }) {
             {isEditing && (
               <TouchableOpacity
                 style={styles.avatarOverlay}
-                onPress={() =>
-                  Alert.alert(
-                    "Image Update",
-                    "This feature requires integrating a local image picker (e.g. expo-image-picker)."
-                  )
-                }
+                onPress={pickImage}
+                disabled={uploadingImage}
               >
-                <Feather name="camera" size={20} color={COLORS.primary} />
+                {uploadingImage ? (
+                  <ActivityIndicator size="small" color={COLORS.primary} />
+                ) : (
+                  <Feather name="camera" size={20} color={COLORS.primary} />
+                )}
               </TouchableOpacity>
             )}
           </View>

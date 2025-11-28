@@ -1,27 +1,57 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, ActivityIndicator, ScrollView, Image, TouchableOpacity, Alert } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ActivityIndicator,
+  ScrollView,
+  Image,
+  TouchableOpacity,
+  Alert,
+  Modal,
+} from "react-native";
 import { useRoute } from "@react-navigation/native";
 import { apiClient } from "../api/client";
 import { COLORS, SHADOWS, RADIUS } from "../styles/theme";
+import { Ionicons, Feather } from "@expo/vector-icons";
 
-// Mobile counterpart of src/pages/OrderDetail.jsx.
-// Fetch a single order by ID using the same endpoint as on the web.
+const ORDER_STATUSES = ["pending", "processing", "shipped", "delivered", "cancelled"];
 
-export default function OrderDetailScreen() {
+const getStatusColor = (status) => {
+  const s = status?.toLowerCase();
+  if (s === "delivered") return { bg: COLORS.success, text: COLORS.surface };
+  if (s === "shipped") return { bg: COLORS.info, text: COLORS.surface };
+  if (s === "processing") return { bg: COLORS.warning, text: COLORS.primaryDark };
+  if (s === "pending") return { bg: COLORS.accent, text: COLORS.primaryDark };
+  if (s === "cancelled" || s === "canceled")
+    return { bg: COLORS.danger, text: COLORS.surface };
+  return { bg: COLORS.muted, text: COLORS.surface };
+};
+
+export default function OrderDetailScreen({ navigation }) {
   const route = useRoute();
-  const { orderId } = route.params;
+  const { orderId } = route.params || {};
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [statusModalVisible, setStatusModalVisible] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
 
   useEffect(() => {
-    fetchOrderDetails();
+    if (orderId) {
+      fetchOrderDetails();
+    } else {
+      setError("No order ID provided");
+      setLoading(false);
+    }
   }, [orderId]);
 
   const fetchOrderDetails = async () => {
     setLoading(true);
     try {
-      const response = await apiClient.get(`/api/v1/order/single/${orderId}`, { withCredentials: true });
+      const response = await apiClient.get(`/api/v1/order/item/${orderId}`, {
+        withCredentials: true,
+      });
       setOrder(response.data.order);
     } catch (err) {
       console.error("Failed to fetch order details:", err);
@@ -31,11 +61,51 @@ export default function OrderDetailScreen() {
     }
   };
 
+  const updateOrderStatus = async (newStatus) => {
+    try {
+      setUpdatingStatus(true);
+      await apiClient.put(
+        `/api/v1/order/update-status/${orderId}`,
+        { status: newStatus },
+        { withCredentials: true }
+      );
+      Alert.alert("Success", "Order status updated successfully!");
+      setStatusModalVisible(false);
+      fetchOrderDetails();
+    } catch (err) {
+      console.error("Failed to update status:", err);
+      Alert.alert(
+        "Error",
+        err.response?.data?.message || "Failed to update order status."
+      );
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
+  const handleStatusChange = (newStatus) => {
+    if (newStatus === order.status) {
+      setStatusModalVisible(false);
+      return;
+    }
+
+    Alert.alert(
+      "Confirm Status Change",
+      `Are you sure you want to change order status to "${newStatus}"?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Confirm",
+          onPress: () => updateOrderStatus(newStatus),
+        },
+      ]
+    );
+  };
+
   const formatDate = (dateString) =>
     dateString ? new Date(dateString).toLocaleString() : "N/A";
 
-  const formatCurrency = (amount) =>
-    `Rs. ${Number(amount || 0).toLocaleString()}`;
+  const formatCurrency = (amount) => `Rs. ${Number(amount || 0).toLocaleString()}`;
 
   if (loading) {
     return (
@@ -49,6 +119,8 @@ export default function OrderDetailScreen() {
   if (error) {
     return (
       <View style={styles.centered}>
+        <Ionicons name="alert-circle" size={50} color={COLORS.danger} />
+        <Text style={styles.errorTitle}>Error</Text>
         <Text style={styles.errorText}>{error}</Text>
         <TouchableOpacity style={styles.retryButton} onPress={fetchOrderDetails}>
           <Text style={styles.retryButtonText}>Retry</Text>
@@ -61,182 +133,454 @@ export default function OrderDetailScreen() {
     return (
       <View style={styles.centered}>
         <Text style={styles.errorText}>Order not found.</Text>
+        <TouchableOpacity
+          style={styles.retryButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Text style={styles.retryButtonText}>Go Back</Text>
+        </TouchableOpacity>
       </View>
     );
   }
 
+  const statusStyle = getStatusColor(order.status);
+
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.heading}>Order Details</Text>
-
-      <View style={styles.card}>
-        <View style={styles.headerRow}>
-          <Text style={styles.orderId}>Order #{order._id?.slice(-6).toUpperCase()}</Text>
-          <View style={styles.statusBadge(order.status)}>
-            <Text style={styles.statusBadgeText}>{order.status?.toUpperCase()}</Text>
-          </View>
-        </View>
-        <Text style={styles.dateText}>Order Date: {formatDate(order.createdAt)}</Text>
-        <Text style={styles.amountText}>Total: {formatCurrency(order.totalPrice)}</Text>
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Products</Text>
-        {order.products?.map((product) => (
-          <View key={product._id} style={styles.productItem}>
-            <Image
-              source={{ uri: product.productId?.images[0] || "https://via.placeholder.com/50" }}
-              style={styles.productImage}
-            />
-            <View style={styles.productInfo}>
-              <Text style={styles.productName}>{product.productId?.name || "Product"}</Text>
-              <Text style={styles.productMeta}>
-                Qty: {product.quantity} • {formatCurrency(product.productId?.price)} / {product.productId?.unit}
+    <View style={styles.container}>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* Order Header */}
+        <View style={styles.headerCard}>
+          <View style={styles.headerRow}>
+            <View>
+              <Text style={styles.orderId}>
+                Order #{order._id?.slice(-6).toUpperCase()}
+              </Text>
+              <Text style={styles.dateText}>
+                {formatDate(order.createdAt)}
               </Text>
             </View>
-            <Text style={styles.productPrice}>{formatCurrency(product.quantity * product.productId?.price)}</Text>
+            <View
+              style={[
+                styles.statusBadge,
+                { backgroundColor: statusStyle.bg },
+              ]}
+            >
+              <Text style={[styles.statusText, { color: statusStyle.text }]}>
+                {order.status?.toUpperCase()}
+              </Text>
+            </View>
           </View>
-        ))}
-      </View>
 
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Shipping Address</Text>
-        <Text style={styles.addressText}>
-          {order.shippingAddress?.street}, {order.shippingAddress?.city}, {order.shippingAddress?.zipCode}
-        </Text>
-        <Text style={styles.addressText}>Phone: {order.shippingAddress?.phoneNumber || "N/A"}</Text>
-      </View>
-    </ScrollView>
+          {/* Status Change Button */}
+          <TouchableOpacity
+            style={styles.changeStatusButton}
+            onPress={() => setStatusModalVisible(true)}
+          >
+            <Ionicons name="create-outline" size={18} color={COLORS.primary} />
+            <Text style={styles.changeStatusText}>Change Status</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Order Summary */}
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Order Summary</Text>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Total Amount:</Text>
+            <Text style={styles.summaryValue}>
+              {formatCurrency(order.totalPrice)}
+            </Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Payment Method:</Text>
+            <Text style={styles.summaryValue}>
+              {order.paymentMethod || "N/A"}
+            </Text>
+          </View>
+          {order.notes && (
+            <View style={styles.notesContainer}>
+              <Text style={styles.notesLabel}>Order Notes:</Text>
+              <Text style={styles.notesText}>{order.notes}</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Products */}
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Products ({order.products?.length || 0})</Text>
+          {order.products?.map((product, index) => (
+            <View key={product._id || index} style={styles.productItem}>
+              <Image
+                source={{
+                  uri:
+                    product.productId?.images?.[0] ||
+                    product.images?.[0] ||
+                    "https://via.placeholder.com/50",
+                }}
+                style={styles.productImage}
+              />
+              <View style={styles.productInfo}>
+                <Text style={styles.productName}>
+                  {product.productId?.name || product.name || "Product"}
+                </Text>
+                <Text style={styles.productMeta}>
+                  Quantity: {product.quantity} ×{" "}
+                  {formatCurrency(
+                    product.productId?.price || product.price || 0
+                  )}{" "}
+                  / {product.productId?.unit || product.unit || "unit"}
+                </Text>
+              </View>
+              <Text style={styles.productPrice}>
+                {formatCurrency(
+                  product.quantity *
+                    (product.productId?.price || product.price || 0)
+                )}
+              </Text>
+            </View>
+          ))}
+        </View>
+
+        {/* Shipping Address */}
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Shipping Address</Text>
+          <View style={styles.addressContainer}>
+            <Ionicons name="location" size={20} color={COLORS.primary} />
+            <View style={styles.addressTextContainer}>
+              <Text style={styles.addressText}>
+                {order.shippingAddress?.street || order.street || "N/A"}
+              </Text>
+              <Text style={styles.addressText}>
+                {order.shippingAddress?.city || order.city || ""}{" "}
+                {order.shippingAddress?.zipCode || order.zipCode || ""}
+              </Text>
+              {order.shippingAddress?.phoneNumber && (
+                <Text style={styles.addressText}>
+                  Phone: {order.shippingAddress.phoneNumber}
+                </Text>
+              )}
+            </View>
+          </View>
+        </View>
+      </ScrollView>
+
+      {/* Status Change Modal */}
+      <Modal
+        visible={statusModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setStatusModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Change Order Status</Text>
+              <TouchableOpacity onPress={() => setStatusModalVisible(false)}>
+                <Ionicons name="close" size={24} color={COLORS.mutedDark} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.statusList}>
+              {ORDER_STATUSES.map((status) => {
+                const isCurrentStatus = status === order.status;
+                const statusStyle = getStatusColor(status);
+                return (
+                  <TouchableOpacity
+                    key={status}
+                    style={[
+                      styles.statusOption,
+                      isCurrentStatus && styles.statusOptionActive,
+                    ]}
+                    onPress={() => handleStatusChange(status)}
+                    disabled={isCurrentStatus || updatingStatus}
+                  >
+                    <View
+                      style={[
+                        styles.statusIndicator,
+                        { backgroundColor: statusStyle.bg },
+                      ]}
+                    />
+                    <Text style={styles.statusOptionText}>
+                      {status.charAt(0).toUpperCase() + status.slice(1)}
+                    </Text>
+                    {isCurrentStatus && (
+                      <Ionicons
+                        name="checkmark-circle"
+                        size={20}
+                        color={COLORS.primary}
+                      />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            {updatingStatus && (
+              <View style={styles.updatingContainer}>
+                <ActivityIndicator size="small" color={COLORS.primary} />
+                <Text style={styles.updatingText}>Updating status...</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: "#F0FFF0",
+  },
+  scrollContent: {
     padding: 16,
-    backgroundColor: "#ffffff"
-  },
-  heading: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#166534",
-    marginBottom: 8
-  },
-  text: {
-    fontSize: 14,
-    color: "#4b5563"
+    paddingBottom: 30,
   },
   centered: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     padding: 20,
-    backgroundColor: "#f0f0f0"
+    backgroundColor: "#F0FFF0",
   },
   loadingText: {
     marginTop: 10,
-    color: "#666"
+    color: COLORS.mutedDark,
+    fontSize: 15,
+  },
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: COLORS.danger,
+    marginTop: 15,
+    marginBottom: 5,
   },
   errorText: {
-    color: "#dc3545",
+    color: COLORS.danger,
     textAlign: "center",
-    marginBottom: 20
+    marginBottom: 20,
+    fontSize: 16,
   },
   retryButton: {
     backgroundColor: COLORS.primary,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: RADIUS.small
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: RADIUS.pill,
   },
   retryButtonText: {
-    color: "#fff",
+    color: COLORS.surface,
     fontSize: 16,
-    fontWeight: "bold"
+    fontWeight: "700",
   },
-  card: {
-    backgroundColor: "#fff",
-    borderRadius: RADIUS.medium,
-    padding: 15,
+  headerCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.lg,
+    padding: 20,
     marginBottom: 15,
-    ...SHADOWS.medium
+    ...SHADOWS.card,
   },
   headerRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 8
+    alignItems: "flex-start",
+    marginBottom: 15,
   },
   orderId: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#333"
-  },
-  statusBadge: (status) => ({
-    backgroundColor: status === "completed" ? COLORS.success : status === "pending" ? COLORS.warning : COLORS.secondary,
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    borderRadius: RADIUS.small
-  }),
-  statusBadgeText: {
-    color: "#fff",
-    fontSize: 12,
-    fontWeight: "bold"
+    fontSize: 22,
+    fontWeight: "800",
+    color: COLORS.primaryDark,
+    marginBottom: 5,
   },
   dateText: {
     fontSize: 14,
-    color: "#555",
-    marginBottom: 8
+    color: COLORS.muted,
   },
-  amountText: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#166534",
-    marginBottom: 15
+  statusBadge: {
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: RADIUS.pill,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  changeStatusButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: RADIUS.md,
+    borderWidth: 2,
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.surface,
+  },
+  changeStatusText: {
+    color: COLORS.primary,
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  card: {
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.lg,
+    padding: 20,
+    marginBottom: 15,
+    ...SHADOWS.card,
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#333",
-    marginBottom: 10
+    fontSize: 18,
+    fontWeight: "700",
+    color: COLORS.primaryDark,
+    marginBottom: 15,
   },
-  productItem: {
+  summaryRow: {
     flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 10,
     paddingBottom: 10,
     borderBottomWidth: 1,
-    borderBottomColor: "#eee"
+    borderBottomColor: COLORS.border,
+  },
+  summaryLabel: {
+    fontSize: 15,
+    color: COLORS.mutedDark,
+    fontWeight: "600",
+  },
+  summaryValue: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: COLORS.primaryDark,
+  },
+  notesContainer: {
+    marginTop: 10,
+    padding: 12,
+    backgroundColor: COLORS.background,
+    borderRadius: RADIUS.md,
+  },
+  notesLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: COLORS.mutedDark,
+    marginBottom: 5,
+  },
+  notesText: {
+    fontSize: 14,
+    color: COLORS.primaryDark,
+    lineHeight: 20,
+  },
+  productItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 15,
+    paddingBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
   },
   productImage: {
-    width: 50,
-    height: 50,
-    borderRadius: RADIUS.small,
-    marginRight: 10
+    width: 60,
+    height: 60,
+    borderRadius: RADIUS.md,
+    marginRight: 15,
+    backgroundColor: COLORS.background,
   },
   productInfo: {
     flex: 1,
-    marginRight: 10
+    marginRight: 10,
   },
   productName: {
-    fontSize: 14,
-    fontWeight: "bold",
-    color: "#333"
+    fontSize: 16,
+    fontWeight: "700",
+    color: COLORS.primaryDark,
+    marginBottom: 5,
   },
   productMeta: {
-    fontSize: 12,
-    color: "#666",
-    marginTop: 2
+    fontSize: 13,
+    color: COLORS.muted,
   },
   productPrice: {
-    fontSize: 14,
-    fontWeight: "bold",
-    color: "#166534"
+    fontSize: 16,
+    fontWeight: "700",
+    color: COLORS.primary,
+  },
+  addressContainer: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  addressTextContainer: {
+    flex: 1,
   },
   addressText: {
     fontSize: 14,
-    color: "#555",
-    marginTop: 5
-  }
+    color: COLORS.primaryDark,
+    marginBottom: 5,
+    lineHeight: 20,
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "flex-end",
+  },
+  modalContent: {
+    backgroundColor: COLORS.surface,
+    borderTopLeftRadius: RADIUS.lg,
+    borderTopRightRadius: RADIUS.lg,
+    maxHeight: "70%",
+    paddingBottom: 20,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: COLORS.primaryDark,
+  },
+  statusList: {
+    padding: 20,
+  },
+  statusOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 15,
+    marginBottom: 10,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.background,
+    borderWidth: 2,
+    borderColor: COLORS.border,
+  },
+  statusOptionActive: {
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.accent,
+  },
+  statusIndicator: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 12,
+  },
+  statusOptionText: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: "600",
+    color: COLORS.primaryDark,
+  },
+  updatingContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    padding: 20,
+  },
+  updatingText: {
+    fontSize: 14,
+    color: COLORS.mutedDark,
+  },
 });
-
-

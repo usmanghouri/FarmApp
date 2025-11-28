@@ -170,12 +170,12 @@ export default function MyOrdersScreen({ navigation }) {
     <View style={styles.container}>
       <View style={styles.headerRow}>
         <Text style={styles.heading}>My Orders</Text>
-        <TouchableOpacity
+        {/* <TouchableOpacity
           style={styles.primaryButton}
           onPress={handleContinueShopping} // FIX: Use the new handler
         >
           <Text style={styles.primaryButtonText}>Continue Shopping</Text>
-        </TouchableOpacity>
+        </TouchableOpacity> */}
       </View>
 
       {actionMessage ? (

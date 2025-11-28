@@ -47,6 +47,7 @@ export default function App() {
             name="Auth"
             component={AuthScreen}
             options={{ title: "Sign in / Sign up" }}
+           //options={{ headerShown: false }}
           />
           <Stack.Screen
             name="FarmerDashboard"
@@ -96,12 +97,13 @@ export default function App() {
           <Stack.Screen
             name="BuyerDashboard"
             component={BuyerDashboardScreen}
+            //options={{ headerShown: false }}
             options={{ title: "Buyer Dashboard" }}
           />
           <Stack.Screen
             name="BuyerProducts"
             component={BuyerProductsScreen}
-            options={{ title: "Buyer Products" }}
+            options={{ title: "Products" }}
           />
           <Stack.Screen
             name="BuyerCart"
@@ -148,11 +150,11 @@ export default function App() {
             component={OrderDetailScreen}
             options={{ title: "Order Detail" }}
           />
-          <Stack.Screen
+          {/* <Stack.Screen
             name="MarketInsights"
             component={MarketInsightsScreen}
             options={{ title: "Market Insights" }}
-          />
+          /> */}
           <Stack.Screen
             name="ChatBot"
             component={ChatBotScreen}

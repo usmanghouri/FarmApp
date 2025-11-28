@@ -25,7 +25,7 @@ const CATEGORIES = [
   { id: "fertilizer", name: "Fertilizer" },
 ];
 
-export default function FarmerProductsScreen() {
+export default function FarmerProductsScreen({ navigation }) {
   const [products, setProducts] = useState([]);
   const [wishlistIds, setWishlistIds] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -192,7 +192,10 @@ export default function FarmerProductsScreen() {
           const imageUrl = item.images?.[0];
           const inWishlist = wishlistIds.includes(item._id);
           return (
-            <View style={styles.card}>
+            <TouchableOpacity 
+              style={styles.card}
+              onPress={() => navigation.navigate("ProductDetail", { productId: item._id })}
+            >
               <View style={styles.imageWrapper}>
                 {imageUrl ? (
                   <Image
@@ -270,7 +273,7 @@ export default function FarmerProductsScreen() {
                   </TouchableOpacity>
                 </View>
               </View>
-            </View>
+            </TouchableOpacity>
           );
         }}
         ListEmptyComponent={

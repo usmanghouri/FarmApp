@@ -60,7 +60,68 @@ export default function SupplierProfileScreen({ navigation }) {
   };
 
   const handleImagePick = async () => {
-    Alert.alert("Image Upload", "Feature requires image picker integration.");
+    try {
+      // Request permission
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+      if (!permissionResult.granted) {
+        Alert.alert("Permission Required", "Please allow access to your photo library to update profile picture.");
+        return;
+      }
+
+      let result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const uri = result.assets[0].uri;
+        setImagePreview(uri);
+        await uploadImage(uri);
+      }
+    } catch (pickerError) {
+      console.error("Image picker error:", pickerError);
+      Alert.alert("Error", "Failed to pick an image.");
+    }
+  };
+
+  const uploadImage = async (uri) => {
+    try {
+      setLoading(true);
+      
+      // Create form data
+      const uploadFormData = new FormData();
+      const filename = uri.split('/').pop();
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1]}` : 'image/jpeg';
+
+      uploadFormData.append('image', {
+        uri,
+        name: filename,
+        type,
+      });
+
+      // Upload to server
+      const response = await apiClient.post('/api/suppliers/upload-image', uploadFormData, {
+        withCredentials: true,
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      if (response.data?.imageUrl) {
+        setFormData((prev) => ({ ...prev, profileImage: response.data.imageUrl }));
+        Alert.alert("Success", "Profile picture updated successfully!");
+        fetchProfile();
+      }
+    } catch (error) {
+      console.error("Image upload error:", error);
+      Alert.alert("Error", error?.response?.data?.message || "Failed to upload image");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleUpdateProfile = async () => {

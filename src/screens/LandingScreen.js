@@ -294,7 +294,7 @@ export default function LandingScreen() {
               <Text style={styles.statLabel}>Farmers Connected</Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={styles.statNumber}>3.5+</Text>
+              <Text style={styles.statNumber}>3.5k+</Text>
               <Text style={styles.statLabel}>Active Buyers</Text>
             </View>
             <View style={styles.statCard}>

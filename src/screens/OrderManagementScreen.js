@@ -193,7 +193,7 @@ export default function OrderManagementScreen() {
              style={styles.detailsButton}
              onPress={() => console.log("Navigate to Order Detail", item._id)}
           >
-             <Text style={styles.detailsText}>View Details</Text>
+             {/* <Text style={styles.detailsText}>View Details</Text> */}
           </TouchableOpacity>
         </View>
       </View>
