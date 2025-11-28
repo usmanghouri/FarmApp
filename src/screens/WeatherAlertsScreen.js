@@ -50,7 +50,7 @@ const processWeatherResponse = (apiData) => {
 
         windSpeed: 7,
 
-        feelsLike: 25.0,
+        feelsLike: 21.0,
 
     };
 

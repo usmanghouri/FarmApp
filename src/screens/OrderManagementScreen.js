@@ -292,10 +292,7 @@ const styles = StyleSheet.create({
     color: COLORS.mutedDark,
   },
   // --- Status Filter Chips ---
-  statusRowScroll: {
-    maxHeight: 45, // Prevent scroll view from stretching indefinitely
-    marginBottom: 15,
-  },
+ 
   statusRow: {
     flexDirection: "row",
     flexWrap: "nowrap",
@@ -303,24 +300,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
     alignItems: 'center',
   },
-  statusChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: RADIUS.pill,
-    backgroundColor: COLORS.border,
-    marginRight: 8,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    flexShrink: 1,
-  },
-  statusChipActive: {
-    // Styles handled by getStatusStyles and applied inline for dynamic colors
-  },
-  statusText: {
-    fontSize: 13,
-    color: COLORS.mutedDark,
-    fontWeight: "600",
-  },
+  // In your styles object, update these:
+statusRowScroll: {
+  maxHeight: 50, // Increased height
+  marginBottom: 15,
+},
+statusChip: {
+  paddingHorizontal: 16, // Increased from 12
+  paddingVertical: 8,    // Increased from 5
+  borderRadius: RADIUS.pill,
+  backgroundColor: COLORS.border,
+  marginRight: 10,       // Increased spacing
+  borderWidth: 1,
+  borderColor: COLORS.border,
+  flexShrink: 1,
+  minHeight: 36,         // Ensure minimum height
+},
+statusText: {
+  fontSize: 14,          // Increased from 13
+  color: COLORS.mutedDark,
+  fontWeight: "600",
+},
   statusTextActive: {
     // Styles handled by getStatusStyles and applied inline for dynamic colors
   },
