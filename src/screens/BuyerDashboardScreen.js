@@ -8,12 +8,12 @@ import {
   TouchableOpacity,
   Image,
   SafeAreaView,
-  StatusBar
+  StatusBar,
 } from "react-native";
 import { apiClient } from "../api/client";
 import { COLORS, SHADOWS, RADIUS } from "../styles/theme";
-import { Ionicons, Feather } from '@expo/vector-icons';
-import { DrawerActions } from '@react-navigation/native';
+import { Ionicons, Feather } from "@expo/vector-icons";
+import { DrawerActions } from "@react-navigation/native";
 import { useLanguage } from "../context/LanguageContext";
 import { translations } from "../translations/translations";
 import ChatBotButton from "../components/ChatBotButton";
@@ -25,15 +25,29 @@ const ACTION_ICONS = {
   "Browse Products": "basket-outline",
   "My Cart": "cart-outline",
   "My Orders": "list-circle-outline",
-  "Wishlist": "heart-outline",
-  "Profile": "person-circle-outline",
+  Wishlist: "heart-outline",
+  Profile: "person-circle-outline",
   "Market Insights": "stats-chart-outline", // Added for clarity
 };
 
 // StatCard Component (Enhanced with Icons and Colors)
 const StatCard = ({ label, value, iconName, color }) => (
-  <View style={[styles.card, { backgroundColor: color || COLORS.surface, borderLeftColor: COLORS.primary, borderLeftWidth: 5 }]}>
-    <Ionicons name={iconName} size={28} color={COLORS.primary} style={styles.cardIcon} />
+  <View
+    style={[
+      styles.card,
+      {
+        backgroundColor: color || COLORS.surface,
+        borderLeftColor: COLORS.primary,
+        borderLeftWidth: 5,
+      },
+    ]}
+  >
+    <Ionicons
+      name={iconName}
+      size={28}
+      color={COLORS.primary}
+      style={styles.cardIcon}
+    />
     <Text style={styles.cardLabel}>{label}</Text>
     <Text style={styles.cardValue}>{value}</Text>
   </View>
@@ -42,13 +56,15 @@ const StatCard = ({ label, value, iconName, color }) => (
 // ActionTile Component (Enhanced with Icons)
 const ActionTile = ({ label, description, onPress, iconKey }) => (
   <TouchableOpacity style={styles.actionTile} onPress={onPress}>
-    <Ionicons 
-      name={ACTION_ICONS[iconKey || label] || 'cube-outline'} 
-      size={30} 
-      color={COLORS.primaryDark} 
+    <Ionicons
+      name={ACTION_ICONS[iconKey || label] || "cube-outline"}
+      size={30}
+      color={COLORS.primaryDark}
     />
     <Text style={styles.actionLabel}>{label}</Text>
-    {description ? <Text style={styles.actionDescription}>{description}</Text> : null}
+    {description ? (
+      <Text style={styles.actionDescription}>{description}</Text>
+    ) : null}
   </TouchableOpacity>
 );
 
@@ -70,35 +86,31 @@ export default function BuyerDashboardScreen({ navigation }) {
       setLoading(true);
       setError("");
       try {
-        const ordersRes = await apiClient.get(
-          "/api/v1/order/user-orders",
-          { withCredentials: true }
-        );
+        const ordersRes = await apiClient.get("/api/v1/order/user-orders", {
+          withCredentials: true,
+        });
         setOrdersCount(ordersRes.data?.orders?.length || 0);
         setRecentOrders(ordersRes.data.orders?.slice(0, 3) || []);
 
-        const wishlistRes = await apiClient.get(
-          "/api/wishlist/my-wishlist",
-          { withCredentials: true }
-        );
+        const wishlistRes = await apiClient.get("/api/wishlist/my-wishlist", {
+          withCredentials: true,
+        });
         setWishlistCount(wishlistRes.data?.wishlist?.products?.length || 0);
 
-        const cartRes = await apiClient.get(
-          "/api/cart/my-cart",
-          { withCredentials: true }
-        );
+        const cartRes = await apiClient.get("/api/cart/my-cart", {
+          withCredentials: true,
+        });
         setCartCount(cartRes.data?.cart?.products?.length || 0);
 
-        const productsResponse = await apiClient.get(
-          "/api/products/all",
-          { withCredentials: true }
-        );
+        const productsResponse = await apiClient.get("/api/products/all", {
+          withCredentials: true,
+        });
         setRecommendedProducts(
-            productsResponse.data.products?.slice(0, 4) || []
+          productsResponse.data.products?.slice(0, 4) || []
         );
-
       } catch (err) {
-        const msg = err?.response?.data?.message || err.message || "Failed to load data";
+        const msg =
+          err?.response?.data?.message || err.message || "Failed to load data";
         setError(msg);
       } finally {
         setLoading(false);
@@ -111,9 +123,10 @@ export default function BuyerDashboardScreen({ navigation }) {
   // Utility to map status to color
   const getStatusColor = (status) => {
     const s = status?.toLowerCase();
-    if (s === 'delivered') return { bg: COLORS.success, text: COLORS.surface };
-    if (s === 'shipped') return { bg: COLORS.info, text: COLORS.surface };
-    if (s === 'canceled' || s === 'cancelled') return { bg: COLORS.danger, text: COLORS.surface };
+    if (s === "delivered") return { bg: COLORS.success, text: COLORS.surface };
+    if (s === "shipped") return { bg: COLORS.info, text: COLORS.surface };
+    if (s === "canceled" || s === "cancelled")
+      return { bg: COLORS.danger, text: COLORS.surface };
     return { bg: COLORS.warning, text: COLORS.primaryDark };
   };
 
@@ -137,138 +150,198 @@ export default function BuyerDashboardScreen({ navigation }) {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#F0FFF0' }}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.primaryDark} />
-      
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#F0FFF0" }}>
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor={COLORS.primaryDark}
+      />
+
       {/* --- Custom Header --- */}
       <View style={styles.header}>
         {/* Language Toggle Button */}
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={toggleLanguage}
           style={styles.languageButton}
         >
-          <Text style={styles.languageText}>{language === "en" ? "اردو" : "EN"}</Text>
+          <Text style={styles.languageText}>
+            {language === "en" ? "اردو" : "EN"}
+          </Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t.title}</Text>
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={() => navigation.navigate("BuyerProfile")}
           style={styles.profileButton}
         >
-          <Ionicons name="person-circle-outline" size={30} color={COLORS.surface} />
+          <Ionicons
+            name="person-circle-outline"
+            size={30}
+            color={COLORS.surface}
+          />
         </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        
         <Text style={styles.welcomeText}>{t.welcome}</Text>
 
         {/* --- Stats Cards --- */}
         <View style={styles.cardSection}>
-            <View style={styles.cardRow}>
-                <StatCard 
-                    label={t.totalOrders} 
-                    value={ordersCount} 
-                    iconName="receipt-outline"
-                    color={COLORS.surface}
-                />
-                <StatCard 
-                    label={t.wishlistItems} 
-                    value={wishlistCount} 
-                    iconName="heart-outline"
-                    color={COLORS.surface}
-                />
-            </View>
-            <View style={styles.cardRow}>
-                <StatCard 
-                    label={t.itemsInCart} 
-                    value={cartCount} 
-                    iconName="cart-outline"
-                    color={COLORS.surface}
-                    style={{ flex: 0.5, marginRight: 10 }}
-                />
-            </View>
+          <View style={styles.cardRow}>
+            <StatCard
+              label={t.totalOrders}
+              value={ordersCount}
+              iconName="receipt-outline"
+              color={COLORS.surface}
+            />
+            <StatCard
+              label={t.wishlistItems}
+              value={wishlistCount}
+              iconName="heart-outline"
+              color={COLORS.surface}
+            />
+          </View>
+          <View style={styles.cardRow}>
+            <StatCard
+              label={t.itemsInCart}
+              value={cartCount}
+              iconName="cart-outline"
+              color={COLORS.surface}
+              style={{ flex: 0.5, marginRight: 10 }}
+            />
+          </View>
         </View>
 
         {/* --- Recent Orders Section --- */}
         <Text style={styles.sectionTitle}>{t.recentOrders}</Text>
         <View style={styles.recentOrdersContainer}>
-            {recentOrders.length > 0 ? (
-                recentOrders.map((order) => {
-                    const statusStyle = getStatusColor(order.status);
-                    return (
-                        <TouchableOpacity
-                            key={order._id}
-                            style={styles.orderItem}
-                            onPress={() => navigation.navigate("OrderDetail", { orderId: order._id })}
-                        >
-                            <Feather name="package" size={18} color={COLORS.primaryDark} />
-                            <View style={styles.orderInfo}>
-                                <Text style={styles.orderId}>Order #{order._id.slice(-6)}</Text>
-                                <Text style={styles.orderMeta}>
-                                    {order.products.length} item{order.products.length !== 1 ? "s" : ""} | {new Date(order.createdAt).toLocaleDateString()}
-                                </Text>
-                            </View>
-                            <View
-                                style={[
-                                    styles.orderStatusBadge,
-                                    { backgroundColor: statusStyle.bg },
-                                ]}
-                            >
-                                <Text
-                                    style={[
-                                        styles.orderStatusText,
-                                        { color: statusStyle.text }
-                                    ]}
-                                >
-                                    {order.status}
-                                </Text>
-                            </View>
-                        </TouchableOpacity>
-                    );
-                })
-            ) : (
-                <Text style={styles.noDataText}>{t.noRecentOrders}</Text>
-            )}
+          {recentOrders.length > 0 ? (
+            recentOrders.map((order) => {
+              const statusStyle = getStatusColor(order.status);
+              return (
+                <TouchableOpacity
+                  key={order._id}
+                  style={styles.orderItem}
+                  onPress={() =>
+                    navigation.navigate("OrderDetail", {
+                      order: order,
+                      allowStatusUpdate: false,
+                    })
+                  }
+                >
+                  <Feather
+                    name="package"
+                    size={18}
+                    color={COLORS.primaryDark}
+                  />
+                  <View style={styles.orderInfo}>
+                    <Text style={styles.orderId}>
+                      Order #{order._id.slice(-6)}
+                    </Text>
+                    <Text style={styles.orderMeta}>
+                      {order.products.length} item
+                      {order.products.length !== 1 ? "s" : ""} |{" "}
+                      {new Date(order.createdAt).toLocaleDateString()}
+                    </Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.orderStatusBadge,
+                      { backgroundColor: statusStyle.bg },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.orderStatusText,
+                        { color: statusStyle.text },
+                      ]}
+                    >
+                      {order.status}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })
+          ) : (
+            <Text style={styles.noDataText}>{t.noRecentOrders}</Text>
+          )}
         </View>
 
         {/* --- Recommended Products Section --- */}
         <Text style={styles.sectionTitle}>{t.recommendedForYou}</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginBottom: 20}}>
-            {recommendedProducts.length > 0 ? (
-                recommendedProducts.map((product) => (
-                    <TouchableOpacity
-                        key={product._id}
-                        style={styles.productItem}
-                        onPress={() => navigation.navigate("BuyerProducts", { productId: product._id })}
-                    >
-                        <Image
-                            source={{ uri: product.images?.[0] || "https://via.placeholder.com/50" }}
-                            style={styles.productImage}
-                        />
-                        <View style={styles.productInfo}>
-                            <Text style={styles.productName} numberOfLines={1}>{product.name}</Text>
-                            <Text style={styles.productPrice}>₨ {product.price.toLocaleString()}</Text>
-                        </View>
-                    </TouchableOpacity>
-                ))
-            ) : (
-                <Text style={styles.noDataText}>{t.noRecommendedProducts}</Text>
-            )}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={{ marginBottom: 20 }}
+        >
+          {recommendedProducts.length > 0 ? (
+            recommendedProducts.map((product) => (
+              <TouchableOpacity
+                key={product._id}
+                style={styles.productItem}
+                onPress={() =>
+                  navigation.navigate("BuyerProducts", {
+                    productId: product._id,
+                  })
+                }
+              >
+                <Image
+                  source={{
+                    uri:
+                      product.images?.[0] || "https://via.placeholder.com/50",
+                  }}
+                  style={styles.productImage}
+                />
+                <View style={styles.productInfo}>
+                  <Text style={styles.productName} numberOfLines={1}>
+                    {product.name}
+                  </Text>
+                  <Text style={styles.productPrice}>
+                    ₨ {product.price.toLocaleString()}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ))
+          ) : (
+            <Text style={styles.noDataText}>{t.noRecommendedProducts}</Text>
+          )}
         </ScrollView>
 
         {/* --- Quick Actions Grid --- */}
         <Text style={styles.sectionTitle}>{t.quickAccess}</Text>
         <View style={styles.actionsGrid}>
-            <ActionTile iconKey="Browse Products" label={t.browseProducts} description={t.browseProductsDesc} onPress={() => navigation.navigate("BuyerProducts")} />
-            <ActionTile iconKey="My Cart" label={t.myCart} description={t.myCartDesc} onPress={() => navigation.navigate("BuyerCart")} />
-            <ActionTile iconKey="My Orders" label={t.myOrders} description={t.myOrdersDesc} onPress={() => navigation.navigate("MyOrders")} /> 
-            <ActionTile iconKey="Wishlist" label={t.wishlist} description={t.wishlistDesc} onPress={() => navigation.navigate("Wishlist")} />
-            <ActionTile iconKey="Profile" label={t.profile} description={t.profileDesc} onPress={() => navigation.navigate("BuyerProfile")} />
-            {/* <ActionTile iconKey="Market Insights" label={t.marketInsights} description={t.marketInsightsDesc} onPress={() => navigation.navigate("MarketInsights")} /> */}
+          <ActionTile
+            iconKey="Browse Products"
+            label={t.browseProducts}
+            description={t.browseProductsDesc}
+            onPress={() => navigation.navigate("BuyerProducts")}
+          />
+          <ActionTile
+            iconKey="My Cart"
+            label={t.myCart}
+            description={t.myCartDesc}
+            onPress={() => navigation.navigate("BuyerCart")}
+          />
+          <ActionTile
+            iconKey="My Orders"
+            label={t.myOrders}
+            description={t.myOrdersDesc}
+            onPress={() => navigation.navigate("MyOrders")}
+          />
+          <ActionTile
+            iconKey="Wishlist"
+            label={t.wishlist}
+            description={t.wishlistDesc}
+            onPress={() => navigation.navigate("Wishlist")}
+          />
+          <ActionTile
+            iconKey="Profile"
+            label={t.profile}
+            description={t.profileDesc}
+            onPress={() => navigation.navigate("BuyerProfile")}
+          />
+          {/* <ActionTile iconKey="Market Insights" label={t.marketInsights} description={t.marketInsightsDesc} onPress={() => navigation.navigate("MarketInsights")} /> */}
         </View>
-        
       </ScrollView>
-      
+
       {/* ChatBot Button */}
       <ChatBotButton onPress={() => navigation.navigate("ChatBot")} />
     </SafeAreaView>
@@ -280,12 +353,12 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 16,
     paddingVertical: 10,
-    backgroundColor: '#F0FFF0', // Soft green background
+    backgroundColor: "#F0FFF0", // Soft green background
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 12,
     backgroundColor: COLORS.primaryDark,
@@ -299,7 +372,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: COLORS.surface,
     flex: 1,
-    textAlign: 'center',
+    textAlign: "center",
   },
   languageButton: {
     padding: 8,
@@ -316,7 +389,7 @@ const styles = StyleSheet.create({
   menuButton: {
     padding: 5,
   },
-  profileButton: { 
+  profileButton: {
     padding: 5,
   },
   welcomeText: {
@@ -325,11 +398,11 @@ const styles = StyleSheet.create({
     color: COLORS.primaryDark,
     marginTop: 15,
     marginBottom: 20,
-    textAlign: 'center',
+    textAlign: "center",
   },
   // --- Stats Cards ---
   cardSection: {
-      marginBottom: 30,
+    marginBottom: 30,
   },
   cardRow: {
     flexDirection: "row",
@@ -345,7 +418,7 @@ const styles = StyleSheet.create({
     ...SHADOWS.card,
   },
   cardIcon: {
-    alignSelf: 'flex-end',
+    alignSelf: "flex-end",
     marginBottom: 8,
   },
   cardLabel: {
@@ -385,8 +458,8 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   orderInfo: {
-      flex: 1,
-      marginLeft: 10,
+    flex: 1,
+    marginLeft: 10,
   },
   orderId: {
     fontSize: 16,
@@ -409,7 +482,7 @@ const styles = StyleSheet.create({
   },
   // --- Recommended Products ---
   recommendedProductsContainer: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 15,
   },
   productItem: {
@@ -419,12 +492,12 @@ const styles = StyleSheet.create({
     padding: 10,
     marginRight: 10,
     ...SHADOWS.soft,
-    alignItems: 'center',
+    alignItems: "center",
     borderBottomWidth: 3,
     borderColor: COLORS.accent,
   },
   productImage: {
-    width: '100%',
+    width: "100%",
     height: 100,
     borderRadius: RADIUS.md,
     marginBottom: 8,
@@ -434,14 +507,14 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: COLORS.primaryDark,
     marginBottom: 2,
-    textAlign: 'center',
+    textAlign: "center",
   },
   productPrice: {
     fontSize: 16,
     fontWeight: "800",
     color: COLORS.primary,
     marginTop: 2,
-    textAlign: 'center',
+    textAlign: "center",
   },
   // --- Quick Actions ---
   actionsGrid: {
@@ -480,14 +553,14 @@ const styles = StyleSheet.create({
     color: COLORS.muted,
     fontStyle: "italic",
     paddingVertical: 10,
-    width: '100%',
+    width: "100%",
   },
   centered: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     padding: 24,
-    backgroundColor: '#F0FFF0',
+    backgroundColor: "#F0FFF0",
   },
   loadingText: {
     marginTop: 10,
@@ -498,7 +571,7 @@ const styles = StyleSheet.create({
     color: COLORS.danger,
     textAlign: "center",
     fontSize: 20,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   errorText: {
     color: COLORS.mutedDark,

@@ -7,12 +7,12 @@ import {
   ScrollView,
   TouchableOpacity,
   SafeAreaView,
-  StatusBar
+  StatusBar,
 } from "react-native";
 import { apiClient } from "../api/client";
 import { COLORS, SHADOWS, RADIUS } from "../styles/theme";
-import { Ionicons, Feather } from '@expo/vector-icons';
-import { DrawerActions } from '@react-navigation/native';
+import { Ionicons, Feather } from "@expo/vector-icons";
+import { DrawerActions } from "@react-navigation/native";
 import { useLanguage } from "../context/LanguageContext";
 import { translations } from "../translations/translations";
 import ChatBotButton from "../components/ChatBotButton";
@@ -21,27 +21,42 @@ import ChatBotButton from "../components/ChatBotButton";
 
 // Action Icon Mapping (Aligned with Supplier focus)
 const ACTION_ICONS = {
-  "Orders": "cube-outline",
-  "Products": "leaf-outline",
-  "Weather": "cloudy-night-outline",
-  "Profile": "person-circle-outline",
+  Orders: "cube-outline",
+  Products: "leaf-outline",
+  Weather: "cloudy-night-outline",
+  Profile: "person-circle-outline",
   "Market Insights": "stats-chart-outline",
-  "Support": "help-circle-outline",
+  Support: "help-circle-outline",
 };
 
 // Utility to map order status to color (reused from OrderManagement)
 const getStatusColor = (status) => {
   const s = status?.toLowerCase();
-  if (s === 'delivered') return { bg: COLORS.success, text: COLORS.surface };
-  if (s === 'shipped') return { bg: COLORS.info, text: COLORS.surface };
-  if (s === 'canceled' || s === 'cancelled') return { bg: COLORS.danger, text: COLORS.surface };
+  if (s === "delivered") return { bg: COLORS.success, text: COLORS.surface };
+  if (s === "shipped") return { bg: COLORS.info, text: COLORS.surface };
+  if (s === "canceled" || s === "cancelled")
+    return { bg: COLORS.danger, text: COLORS.surface };
   return { bg: COLORS.warning, text: COLORS.primaryDark };
 };
 
 // StatCard Component (Enhanced with Icons and Colors)
 const StatCard = ({ label, value, subtitle, iconName, color }) => (
-  <View style={[styles.card, { backgroundColor: color || COLORS.surface, borderLeftColor: COLORS.primary, borderLeftWidth: 5 }]}>
-    <Ionicons name={iconName} size={28} color={COLORS.primary} style={styles.cardIcon} />
+  <View
+    style={[
+      styles.card,
+      {
+        backgroundColor: color || COLORS.surface,
+        borderLeftColor: COLORS.primary,
+        borderLeftWidth: 5,
+      },
+    ]}
+  >
+    <Ionicons
+      name={iconName}
+      size={28}
+      color={COLORS.primary}
+      style={styles.cardIcon}
+    />
     <Text style={styles.cardLabel}>{label}</Text>
     <Text style={styles.cardValue}>{value}</Text>
     {subtitle && <Text style={styles.cardSubtitle}>{subtitle}</Text>}
@@ -51,13 +66,15 @@ const StatCard = ({ label, value, subtitle, iconName, color }) => (
 // ActionTile Component (Enhanced with Icons)
 const ActionTile = ({ label, description, onPress, iconKey }) => (
   <TouchableOpacity style={styles.actionTile} onPress={onPress}>
-    <Ionicons 
-      name={ACTION_ICONS[iconKey || label] || 'cube-outline'} 
-      size={30} 
-      color={COLORS.primaryDark} 
+    <Ionicons
+      name={ACTION_ICONS[iconKey || label] || "cube-outline"}
+      size={30}
+      color={COLORS.primaryDark}
     />
     <Text style={styles.actionLabel}>{label}</Text>
-    {description ? <Text style={styles.actionDescription}>{description}</Text> : null}
+    {description ? (
+      <Text style={styles.actionDescription}>{description}</Text>
+    ) : null}
   </TouchableOpacity>
 );
 
@@ -82,18 +99,45 @@ export default function SupplierDashboardScreen({ navigation }) {
           "/api/v1/order/supplier-orders",
           { withCredentials: true }
         );
-        
-        const allOrders = ordersResponse.data?.orders || [];
-        const activeOrders = allOrders.filter(o => o.status === 'pending' || o.status === 'processing').length;
+
+        const data = ordersResponse.data || {};
+        let allOrders = [];
+
+        if (data.success !== undefined) {
+          if (data.success) {
+            allOrders = data.orders || [];
+          } else {
+            throw new Error(data.message || "Failed to load orders");
+          }
+        } else {
+          allOrders = data.orders || data || [];
+        }
+
+        const getOrderStatus = (order) =>
+          (order.orderStatus || order.status || "").toLowerCase();
+
+        const activeOrders = allOrders.filter((o) => {
+          const status = getOrderStatus(o);
+          return (
+            status === "pending" ||
+            status === "processing" ||
+            status === "confirmed"
+          );
+        }).length;
         setActiveOrdersCount(activeOrders);
 
-        setRecentOrders(allOrders.slice(0, 3));
+        const sortedOrders = [...allOrders].sort((a, b) => {
+          const dateA = new Date(a.createdAt || 0).getTime();
+          const dateB = new Date(b.createdAt || 0).getTime();
+          return dateB - dateA;
+        });
+        setRecentOrders(sortedOrders.slice(0, 3));
 
         const currentMonth = new Date().getMonth();
         const currentYear = new Date().getFullYear();
         const monthlyRevenue = allOrders.reduce((sum, order) => {
           if (
-            order.status === "delivered" &&
+            getOrderStatus(order) === "delivered" &&
             new Date(order.createdAt).getMonth() === currentMonth &&
             new Date(order.createdAt).getFullYear() === currentYear
           ) {
@@ -138,121 +182,165 @@ export default function SupplierDashboardScreen({ navigation }) {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#F0FFF0' }}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.primaryDark} />
-      
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#F0FFF0" }}>
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor={COLORS.primaryDark}
+      />
+
       {/* --- Custom Header --- */}
       <View style={styles.header}>
         {/* Language Toggle Button */}
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={toggleLanguage}
           style={styles.languageButton}
         >
-          <Text style={styles.languageText}>{language === "en" ? "اردو" : "EN"}</Text>
+          <Text style={styles.languageText}>
+            {language === "en" ? "اردو" : "EN"}
+          </Text>
         </TouchableOpacity>
-        
+
         <Text style={styles.headerTitle}>{t.title}</Text>
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={() => navigation.navigate("SupplierProfile")}
           style={styles.profileButton}
         >
-          <Ionicons name="person-circle-outline" size={30} color={COLORS.surface} />
+          <Ionicons
+            name="person-circle-outline"
+            size={30}
+            color={COLORS.surface}
+          />
         </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        
         <Text style={styles.welcomeText}>{t.welcome}</Text>
 
         {/* --- Stats cards --- */}
         <View style={styles.cardSection}>
-            <View style={styles.cardRow}>
-                <StatCard 
-                    label={t.activeOrders} 
-                    value={activeOrdersCount} 
-                    iconName="time-outline"
-                    color={COLORS.surface}
-                />
-                <StatCard 
-                    label={t.productsListed} 
-                    value={productsCount} 
-                    iconName="leaf-outline"
-                    color={COLORS.surface}
-                />
-            </View>
-            <View style={styles.cardRow}>
-                <StatCard 
-                    label={`${t.revenue} (${new Date().toLocaleString('default', { month: 'short' })})`} 
-                    value={`Rs. ${revenue.toLocaleString()}`} 
-                    iconName="cash-outline"
-                    color={COLORS.surface}
-                />
-                {/* Mocked Weather Status Card */}
-                {/* <StatCard 
+          <View style={styles.cardRow}>
+            <StatCard
+              label={t.activeOrders}
+              value={activeOrdersCount}
+              iconName="time-outline"
+              color={COLORS.surface}
+            />
+            <StatCard
+              label={t.productsListed}
+              value={productsCount}
+              iconName="leaf-outline"
+              color={COLORS.surface}
+            />
+          </View>
+          <View style={styles.cardRow}>
+            <StatCard
+              label={`${t.revenue} (${new Date().toLocaleString("default", {
+                month: "short",
+              })})`}
+              value={`Rs. ${revenue.toLocaleString()}`}
+              iconName="cash-outline"
+              color={COLORS.surface}
+            />
+            {/* Mocked Weather Status Card */}
+            {/* <StatCard 
                     label={t.weatherStatus} 
                     value="Optimal" 
                     subtitle="30°C / Light Wind" 
                     iconName="cloudy-night-outline"
                     color={COLORS.surface}
                 /> */}
-            </View>
+          </View>
         </View>
 
         {/* --- Recent Orders Section --- */}
-        <Text style={styles.sectionTitle}>{t.recentOrders}</Text>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>{t.recentOrders}</Text>
+          <TouchableOpacity
+            onPress={() => navigation.navigate("OrderManagement")}
+          >
+            <Text style={styles.viewAllText}>{t.viewAll || "View All"}</Text>
+          </TouchableOpacity>
+        </View>
         <View style={styles.recentOrdersContainer}>
-            {recentOrders.length > 0 ? (
-                recentOrders.map((order) => {
-                    const statusStyle = getStatusColor(order.status);
-                    return (
-                        <TouchableOpacity
-                            key={order._id}
-                            style={styles.orderItem}
-                            onPress={() => navigation.navigate("OrderManagement", { orderId: order._id })}
-                        >
-                            <Feather name="truck" size={18} color={COLORS.primaryDark} />
-                            <View style={styles.orderInfo}>
-                                <Text style={styles.orderId}>Order #{order._id?.slice(-6).toUpperCase()}</Text>
-                                <Text style={styles.orderMeta}>
-                                    {order.products[0]?.name || "N/A"} | Items: {order.products.length}
-                                </Text>
-                            </View>
-                            <View
-                                style={[
-                                    styles.orderStatusBadge,
-                                    { backgroundColor: statusStyle.bg },
-                                ]}
-                            >
-                                <Text
-                                    style={[
-                                        styles.orderStatusText,
-                                        { color: statusStyle.text }
-                                    ]}
-                                >
-                                    {order.status}
-                                </Text>
-                            </View>
-                        </TouchableOpacity>
-                    );
-                })
-            ) : (
-                <Text style={styles.noDataText}>{t.noRecentOrders}</Text>
-            )}
+          {recentOrders.length > 0 ? (
+            recentOrders.map((order) => {
+              const orderStatus = order.orderStatus || order.status;
+              const statusStyle = getStatusColor(orderStatus);
+              return (
+                <TouchableOpacity
+                  key={order._id}
+                  style={styles.orderItem}
+                  onPress={() =>
+                    navigation.navigate("OrderDetail", { order: order })
+                  }
+                >
+                  <Feather name="truck" size={18} color={COLORS.primaryDark} />
+                  <View style={styles.orderInfo}>
+                    <Text style={styles.orderId}>
+                      Order #{order._id?.slice(-6).toUpperCase()}
+                    </Text>
+                    <Text style={styles.orderMeta}>
+                      {order.products[0]?.productId?.name ||
+                        order.products[0]?.name ||
+                        "N/A"}{" "}
+                      | Items: {order.products.length}
+                    </Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.orderStatusBadge,
+                      { backgroundColor: statusStyle.bg },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.orderStatusText,
+                        { color: statusStyle.text },
+                      ]}
+                    >
+                      {orderStatus}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })
+          ) : (
+            <Text style={styles.noDataText}>{t.noRecentOrders}</Text>
+          )}
         </View>
 
         {/* --- Quick Actions Grid --- */}
         <Text style={styles.sectionTitle}>{t.quickActions}</Text>
         <View style={styles.actionsGrid}>
-            <ActionTile iconKey="Orders" label={t.orders} description={t.ordersDesc} onPress={() => navigation.navigate("OrderManagement")} />
-            <ActionTile iconKey="Products" label={t.products} description={t.productsDesc} onPress={() => navigation.navigate("ProductManagement")} />
-            <ActionTile iconKey="Weather" label={t.weather} description={t.weatherDesc} onPress={() => navigation.navigate("WeatherAlerts")} />
-            <ActionTile iconKey="Profile" label={t.profile} description={t.profileDesc} onPress={() => navigation.navigate("SupplierProfile")} />
-            {/* <ActionTile iconKey="Market Insights" label={t.marketInsights} description={t.marketInsightsDesc} onPress={() => navigation.navigate("MarketInsights")} />
+          <ActionTile
+            iconKey="Orders"
+            label={t.orders}
+            description={t.ordersDesc}
+            onPress={() => navigation.navigate("OrderManagement")}
+          />
+          <ActionTile
+            iconKey="Products"
+            label={t.products}
+            description={t.productsDesc}
+            onPress={() => navigation.navigate("ProductManagement")}
+          />
+          <ActionTile
+            iconKey="Weather"
+            label={t.weather}
+            description={t.weatherDesc}
+            onPress={() => navigation.navigate("WeatherAlerts")}
+          />
+          <ActionTile
+            iconKey="Profile"
+            label={t.profile}
+            description={t.profileDesc}
+            onPress={() => navigation.navigate("SupplierProfile")}
+          />
+          {/* <ActionTile iconKey="Market Insights" label={t.marketInsights} description={t.marketInsightsDesc} onPress={() => navigation.navigate("MarketInsights")} />
             <ActionTile iconKey="Support" label={t.support} description={t.supportDesc} onPress={() => console.log('Support')} />  */}
         </View>
-        
       </ScrollView>
-      
+
       {/* ChatBot Button */}
       <ChatBotButton onPress={() => navigation.navigate("ChatBot")} />
     </SafeAreaView>
@@ -263,9 +351,9 @@ export default function SupplierDashboardScreen({ navigation }) {
 const styles = StyleSheet.create({
   // --- Header Styles ---
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 12,
     backgroundColor: COLORS.primaryDark,
@@ -279,7 +367,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: COLORS.surface,
     flex: 1,
-    textAlign: 'center',
+    textAlign: "center",
   },
   languageButton: {
     padding: 8,
@@ -296,13 +384,13 @@ const styles = StyleSheet.create({
   menuButton: {
     padding: 5,
   },
-  profileButton: { 
+  profileButton: {
     padding: 5,
   },
   scrollContent: {
     paddingHorizontal: 16,
     paddingVertical: 10,
-    backgroundColor: '#F0FFF0', // Soft green background
+    backgroundColor: "#F0FFF0", // Soft green background
   },
   welcomeText: {
     fontSize: 22,
@@ -310,11 +398,11 @@ const styles = StyleSheet.create({
     color: COLORS.primaryDark,
     marginTop: 15,
     marginBottom: 20,
-    textAlign: 'center',
+    textAlign: "center",
   },
   // --- Stats Card Styles ---
   cardSection: {
-      marginBottom: 30,
+    marginBottom: 30,
   },
   cardRow: {
     flexDirection: "row",
@@ -332,7 +420,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.primary,
   },
   cardIcon: {
-    alignSelf: 'flex-end',
+    alignSelf: "flex-end",
     marginBottom: 8,
   },
   cardLabel: {
@@ -359,6 +447,18 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: COLORS.primaryDark,
   },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 10,
+    marginBottom: 15,
+  },
+  viewAllText: {
+    fontSize: 14,
+    color: COLORS.primary,
+    fontWeight: "700",
+  },
   recentOrdersContainer: {
     backgroundColor: COLORS.surface,
     borderRadius: RADIUS.lg,
@@ -376,8 +476,8 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   orderInfo: {
-      flex: 1,
-      marginLeft: 10,
+    flex: 1,
+    marginLeft: 10,
   },
   orderId: {
     fontSize: 16,
@@ -435,14 +535,14 @@ const styles = StyleSheet.create({
     color: COLORS.muted,
     fontStyle: "italic",
     paddingVertical: 10,
-    width: '100%',
+    width: "100%",
   },
   centered: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     padding: 24,
-    backgroundColor: '#F0FFF0',
+    backgroundColor: "#F0FFF0",
   },
   loadingText: {
     marginTop: 10,

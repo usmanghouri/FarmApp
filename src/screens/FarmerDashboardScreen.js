@@ -264,8 +264,8 @@ import {
 } from "react-native";
 import { apiClient } from "../api/client";
 import { COLORS, SHADOWS, RADIUS } from "../styles/theme";
-import { Ionicons, Feather } from '@expo/vector-icons'; 
-import { DrawerActions } from '@react-navigation/native';
+import { Ionicons, Feather } from "@expo/vector-icons";
+import { DrawerActions } from "@react-navigation/native";
 import { useLanguage } from "../context/LanguageContext";
 import { translations } from "../translations/translations";
 import ChatBotButton from "../components/ChatBotButton";
@@ -273,31 +273,37 @@ import ChatBotButton from "../components/ChatBotButton";
 // Utility to map order status to color
 const getStatusColor = (status) => {
   const s = status?.toLowerCase();
-  if (s === 'delivered') return { bg: COLORS.success, text: COLORS.surface };
-  if (s === 'shipped') return { bg: COLORS.info, text: COLORS.surface };
-  if (s === 'canceled' || s === 'cancelled') return { bg: COLORS.danger, text: COLORS.surface };
+  if (s === "delivered") return { bg: COLORS.success, text: COLORS.surface };
+  if (s === "shipped") return { bg: COLORS.info, text: COLORS.surface };
+  if (s === "canceled" || s === "cancelled")
+    return { bg: COLORS.danger, text: COLORS.surface };
   return { bg: COLORS.warning, text: COLORS.primaryDark };
 };
 
 // --- Icon Mapping for Action Tiles ---
 const ACTION_ICONS = {
-  "Dashboard": "home-outline",
+  Dashboard: "home-outline",
   "My Products": "leaf-outline",
   "Manage Products": "hammer-outline",
-  "Orders": "cube-outline",
-  "Cart": "cart-outline",
+  Orders: "cube-outline",
+  Cart: "cart-outline",
   "My Orders": "list-circle-outline",
-  "Wishlist": "heart-outline",
-  "Weather": "cloudy-night-outline",
-  "Profile": "person-circle-outline",
+  Wishlist: "heart-outline",
+  Weather: "cloudy-night-outline",
+  Profile: "person-circle-outline",
 };
 
 // --- Custom Components ---
 
 // StatCard Component (Enhanced)
 const StatCard = ({ label, value, iconName, color, style }) => (
-  <View style={[styles.card, {backgroundColor: color}, style]}>
-    <Ionicons name={iconName} size={32} color={COLORS.surface} style={styles.cardIcon} />
+  <View style={[styles.card, { backgroundColor: color }, style]}>
+    <Ionicons
+      name={iconName}
+      size={32}
+      color={COLORS.surface}
+      style={styles.cardIcon}
+    />
     <Text style={styles.cardLabel}>{label}</Text>
     <Text style={styles.cardValue}>{value}</Text>
   </View>
@@ -306,13 +312,15 @@ const StatCard = ({ label, value, iconName, color, style }) => (
 // ActionTile Component (Enhanced with Icons)
 const ActionTile = ({ label, description, onPress, iconKey }) => (
   <TouchableOpacity style={styles.actionTile} onPress={onPress}>
-    <Ionicons 
-      name={ACTION_ICONS[iconKey || label] || 'bookmark-outline'} 
-      size={30} 
-      color={COLORS.primary} 
+    <Ionicons
+      name={ACTION_ICONS[iconKey || label] || "bookmark-outline"}
+      size={30}
+      color={COLORS.primary}
     />
     <Text style={styles.actionLabel}>{label}</Text>
-    {description ? <Text style={styles.actionDescription}>{description}</Text> : null}
+    {description ? (
+      <Text style={styles.actionDescription}>{description}</Text>
+    ) : null}
   </TouchableOpacity>
 );
 
@@ -338,20 +346,38 @@ export default function FarmerDashboardScreen({ navigation }) {
           { withCredentials: true }
         );
 
-        const orders = ordersResponse.data?.orders || [];
-        const activeCount = orders.filter(o => o.status !== "delivered" && o.status !== "cancelled").length;
+        const data = ordersResponse.data || {};
+        let orders = [];
+
+        if (data.success !== undefined) {
+          if (data.success) {
+            orders = data.orders || [];
+          } else {
+            throw new Error(data.message || "Failed to load orders");
+          }
+        } else {
+          orders = data.orders || data || [];
+        }
+
+        const getOrderStatus = (order) =>
+          (order.orderStatus || order.status || "").toLowerCase();
+
+        const activeCount = orders.filter((o) => {
+          const status = getOrderStatus(o);
+          return status !== "delivered" && status !== "cancelled";
+        }).length;
         setActiveOrdersCount(activeCount);
-        
+
         // Set recent orders (first 3)
-        setRecentOrders(orders.slice(0, 3)); 
+        setRecentOrders(orders.slice(0, 3));
 
         const now = new Date();
         const currentMonth = now.getMonth();
         const currentYear = now.getFullYear();
         const monthlyRevenue = orders
           .filter(
-            o =>
-              o.status === "delivered" &&
+            (o) =>
+              getOrderStatus(o) === "delivered" &&
               new Date(o.createdAt).getMonth() === currentMonth &&
               new Date(o.createdAt).getFullYear() === currentYear
           )
@@ -364,7 +390,8 @@ export default function FarmerDashboardScreen({ navigation }) {
         );
         setProductsCount(productsResponse.data?.products?.length || 0);
       } catch (err) {
-        const msg = err?.response?.data?.message || err.message || "Failed to load data";
+        const msg =
+          err?.response?.data?.message || err.message || "Failed to load data";
         setError(msg);
       } finally {
         setLoading(false);
@@ -393,52 +420,62 @@ export default function FarmerDashboardScreen({ navigation }) {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background }}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.primaryDark} />
-      
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor={COLORS.primaryDark}
+      />
+
       {/* --- Custom Header --- */}
       <View style={styles.header}>
         {/* Language Toggle Button */}
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={toggleLanguage}
           style={styles.languageButton}
         >
-          <Text style={styles.languageText}>{language === "en" ? "اردو" : "EN"}</Text>
+          <Text style={styles.languageText}>
+            {language === "en" ? "اردو" : "EN"}
+          </Text>
         </TouchableOpacity>
-        
+
         <Text style={styles.headerTitle}>{t.title}</Text>
-        
+
         {/* Profile Button to navigate */}
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={() => navigation.navigate("FarmerProfile")}
           style={styles.profileButton}
         >
-          <Ionicons name="person-circle-outline" size={30} color={COLORS.surface} />
+          <Ionicons
+            name="person-circle-outline"
+            size={30}
+            color={COLORS.surface}
+          />
         </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        
         <Text style={styles.welcomeText}>{t.welcome}</Text>
 
         {/* --- Stats Cards (Enhanced) --- */}
         <View style={styles.cardSection}>
-          <StatCard 
-            label={t.activeOrders} 
-            value={activeOrdersCount} 
+          <StatCard
+            label={t.activeOrders}
+            value={activeOrdersCount}
             iconName="pricetags-outline"
             color={COLORS.primary}
             style={{ marginBottom: 15 }}
           />
           <View style={styles.cardRow}>
-            <StatCard 
-              label={t.myProducts} 
-              value={productsCount} 
+            <StatCard
+              label={t.myProducts}
+              value={productsCount}
               iconName="cube-outline"
               color={COLORS.primaryDark}
             />
-            <StatCard 
-              label={`${t.revenue} (${new Date().toLocaleString('default', { month: 'short' })})`} 
-              value={`Rs ${revenue.toLocaleString()}`} 
+            <StatCard
+              label={`${t.revenue} (${new Date().toLocaleString("default", {
+                month: "short",
+              })})`}
+              value={`Rs ${revenue.toLocaleString()}`}
               iconName="cash-outline"
               color={COLORS.success}
             />
@@ -446,27 +483,55 @@ export default function FarmerDashboardScreen({ navigation }) {
         </View>
 
         {/* --- Recent Orders Section --- */}
-        <Text style={styles.sectionTitle}>Recent Orders</Text>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Recent Orders</Text>
+          <TouchableOpacity
+            onPress={() => navigation.navigate("OrderManagement")}
+          >
+            <Text style={styles.viewAllText}>View All</Text>
+          </TouchableOpacity>
+        </View>
         <View style={styles.recentOrdersContainer}>
           {recentOrders.length > 0 ? (
             recentOrders.map((order) => {
-              const statusStyle = getStatusColor(order.status);
+              const orderStatus = order.orderStatus || order.status;
+              const statusStyle = getStatusColor(orderStatus);
               return (
                 <TouchableOpacity
                   key={order._id}
                   style={styles.orderItem}
-                  onPress={() => navigation.navigate("OrderDetail", { orderId: order._id })}
+                  onPress={() =>
+                    navigation.navigate("OrderDetail", { order: order })
+                  }
                 >
-                  <Feather name="package" size={18} color={COLORS.primaryDark} />
+                  <Feather
+                    name="package"
+                    size={18}
+                    color={COLORS.primaryDark}
+                  />
                   <View style={styles.orderInfo}>
-                    <Text style={styles.orderId}>Order #{order._id?.slice(-6).toUpperCase()}</Text>
+                    <Text style={styles.orderId}>
+                      Order #{order._id?.slice(-6).toUpperCase()}
+                    </Text>
                     <Text style={styles.orderMeta}>
-                      {order.products?.length || 0} item{order.products?.length !== 1 ? "s" : ""} | {new Date(order.createdAt).toLocaleDateString()}
+                      {order.products?.length || 0} item
+                      {order.products?.length !== 1 ? "s" : ""} |{" "}
+                      {new Date(order.createdAt).toLocaleDateString()}
                     </Text>
                   </View>
-                  <View style={[styles.orderStatusBadge, { backgroundColor: statusStyle.bg }]}>
-                    <Text style={[styles.orderStatusText, { color: statusStyle.text }]}>
-                      {order.status}
+                  <View
+                    style={[
+                      styles.orderStatusBadge,
+                      { backgroundColor: statusStyle.bg },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.orderStatusText,
+                        { color: statusStyle.text },
+                      ]}
+                    >
+                      {orderStatus}
                     </Text>
                   </View>
                 </TouchableOpacity>
@@ -480,18 +545,57 @@ export default function FarmerDashboardScreen({ navigation }) {
         {/* --- Quick Actions Grid (Enhanced) --- */}
         <Text style={styles.sectionTitle}>{t.quickActions}</Text>
         <View style={styles.actionsGrid}>
-          <ActionTile iconKey="Manage Products" label={t.manageProducts} description={t.manageProductsDesc} onPress={() => navigation.navigate("FarmerProducts")} />
-          <ActionTile iconKey="My Products" label={t.myProductsLabel} description={t.myProductsDesc} onPress={() => navigation.navigate("ProductManagement")} />
-          <ActionTile iconKey="Orders" label={t.orders} description={t.ordersDesc} onPress={() => navigation.navigate("OrderManagement")} />
-          <ActionTile iconKey="My Orders" label={t.myOrders} description={t.myOrdersDesc} onPress={() => navigation.navigate("MyOrders")} />
-          <ActionTile iconKey="Wishlist" label={t.wishlist} description={t.wishlistDesc} onPress={() => navigation.navigate("Wishlist")} />
-          <ActionTile iconKey="Weather" label={t.weather} description={t.weatherDesc} onPress={() => navigation.navigate("WeatherAlerts")} />
-          <ActionTile iconKey="Profile" label={t.profile} description={t.profileDesc} onPress={() => navigation.navigate("FarmerProfile")} />
-          <ActionTile iconKey="Cart" label={t.cart} description={t.cartDesc} onPress={() => navigation.navigate("ShoppingCart")} />
+          <ActionTile
+            iconKey="Manage Products"
+            label={t.manageProducts}
+            description={t.manageProductsDesc}
+            onPress={() => navigation.navigate("FarmerProducts")}
+          />
+          <ActionTile
+            iconKey="My Products"
+            label={t.myProductsLabel}
+            description={t.myProductsDesc}
+            onPress={() => navigation.navigate("ProductManagement")}
+          />
+          <ActionTile
+            iconKey="Orders"
+            label={t.orders}
+            description={t.ordersDesc}
+            onPress={() => navigation.navigate("OrderManagement")}
+          />
+          <ActionTile
+            iconKey="My Orders"
+            label={t.myOrders}
+            description={t.myOrdersDesc}
+            onPress={() => navigation.navigate("MyOrders")}
+          />
+          <ActionTile
+            iconKey="Wishlist"
+            label={t.wishlist}
+            description={t.wishlistDesc}
+            onPress={() => navigation.navigate("Wishlist")}
+          />
+          <ActionTile
+            iconKey="Weather"
+            label={t.weather}
+            description={t.weatherDesc}
+            onPress={() => navigation.navigate("WeatherAlerts")}
+          />
+          <ActionTile
+            iconKey="Profile"
+            label={t.profile}
+            description={t.profileDesc}
+            onPress={() => navigation.navigate("FarmerProfile")}
+          />
+          <ActionTile
+            iconKey="Cart"
+            label={t.cart}
+            description={t.cartDesc}
+            onPress={() => navigation.navigate("ShoppingCart")}
+          />
         </View>
-        
       </ScrollView>
-      
+
       {/* ChatBot Button */}
       <ChatBotButton onPress={() => navigation.navigate("ChatBot")} />
     </SafeAreaView>
@@ -506,9 +610,9 @@ const styles = StyleSheet.create({
   },
   // --- Header Styles ---
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 12,
     backgroundColor: COLORS.primaryDark,
@@ -522,7 +626,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: COLORS.surface,
     flex: 1,
-    textAlign: 'center',
+    textAlign: "center",
   },
   languageButton: {
     padding: 8,
@@ -539,7 +643,8 @@ const styles = StyleSheet.create({
   menuButton: {
     padding: 5,
   },
-  profileButton: { // Style for the profile icon container
+  profileButton: {
+    // Style for the profile icon container
     padding: 5,
   },
   welcomeText: {
@@ -548,7 +653,7 @@ const styles = StyleSheet.create({
     color: COLORS.primaryDark,
     marginTop: 15,
     marginBottom: 20,
-    textAlign: 'center',
+    textAlign: "center",
   },
   // --- Stats Card Styles ---
   cardSection: {
@@ -566,11 +671,11 @@ const styles = StyleSheet.create({
     padding: 20,
     ...SHADOWS.card,
     minHeight: 120,
-    justifyContent: 'space-between',
+    justifyContent: "space-between",
     marginBottom: 10,
   },
   cardIcon: {
-    alignSelf: 'flex-start',
+    alignSelf: "flex-start",
     marginBottom: 10,
   },
   cardLabel: {
@@ -592,6 +697,18 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: COLORS.primaryDark,
   },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 10,
+    marginBottom: 15,
+  },
+  viewAllText: {
+    fontSize: 14,
+    color: COLORS.primary,
+    fontWeight: "700",
+  },
   actionsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -608,7 +725,7 @@ const styles = StyleSheet.create({
     minHeight: 120,
     justifyContent: "space-between",
     borderLeftWidth: 5,
-    borderColor: COLORS.accent, 
+    borderColor: COLORS.accent,
   },
   actionLabel: {
     fontSize: 17,
@@ -686,7 +803,6 @@ const styles = StyleSheet.create({
     color: COLORS.muted,
     fontStyle: "italic",
     paddingVertical: 10,
-    width: '100%',
+    width: "100%",
   },
 });
-

@@ -9,7 +9,7 @@ import {
   TextInput,
   ScrollView,
   Image,
-  Alert
+  Alert,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { apiClient } from "../api/client";
@@ -25,7 +25,7 @@ const CATEGORY_OPTIONS = [
   "Crops",
   "Pesticides",
   "Fertilizer",
-  "Other"
+  "Other",
 ];
 
 const UNIT_OPTIONS = ["kg", "g", "lb", "maund", "piece"];
@@ -37,7 +37,7 @@ const emptyForm = {
   unit: "kg",
   quantity: "",
   category: "",
-  imageUrl: ""
+  imageUrl: "",
 };
 
 export default function ProductManagementScreen() {
@@ -55,14 +55,15 @@ export default function ProductManagementScreen() {
     try {
       setLoading(true);
       setError("");
-      const res = await apiClient.get(
-        "/api/products/my_product",
-        { withCredentials: true }
-      );
+      const res = await apiClient.get("/api/products/my_product", {
+        withCredentials: true,
+      });
       setProducts(res.data?.products || []);
     } catch (err) {
       const msg =
-        err?.response?.data?.message || err.message || "Failed to load products";
+        err?.response?.data?.message ||
+        err.message ||
+        "Failed to load products";
       setError(msg);
     } finally {
       setLoading(false);
@@ -112,7 +113,12 @@ export default function ProductManagementScreen() {
     setLoading(true);
     try {
       const formData = new FormData();
-      formData.append("file", { uri: imageUri, name: "upload.jpg", type: "image/jpeg" });
+      // React Native FormData structure - no manual Content-Type header needed
+      formData.append("file", {
+        uri: imageUri,
+        name: "upload.jpg",
+        type: "image/jpeg",
+      });
       formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
 
       const response = await fetch(
@@ -120,11 +126,15 @@ export default function ProductManagementScreen() {
         {
           method: "POST",
           body: formData,
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
+          // Don't set Content-Type manually - let React Native set it with boundary
         }
       );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Cloudinary upload failed:", response.status, errorText);
+        throw new Error(`Upload failed with status ${response.status}`);
+      }
 
       const data = await response.json();
 
@@ -132,11 +142,17 @@ export default function ProductManagementScreen() {
         handleChange("imageUrl", data.secure_url);
         setActionMessage("Image uploaded successfully!");
       } else {
-        setActionMessage("Failed to upload image to Cloudinary.");
+        console.error("No secure_url in response:", data);
+        setActionMessage(
+          data.error?.message || "Failed to upload image to Cloudinary."
+        );
       }
     } catch (uploadError) {
       console.error("Cloudinary upload error:", uploadError);
-      setActionMessage("Cloudinary upload error. Please try again.");
+      const errorMsg =
+        uploadError?.message || "Cloudinary upload error. Please try again.";
+      setActionMessage(`Error: ${errorMsg}`);
+      Alert.alert("Upload Error", errorMsg);
     } finally {
       setLoading(false);
     }
@@ -163,21 +179,17 @@ export default function ProductManagementScreen() {
         unit: form.unit,
         quantity: Number(form.quantity),
         category: form.category,
-        images: form.imageUrl ? [form.imageUrl] : []
+        images: form.imageUrl ? [form.imageUrl] : [],
       };
       if (editingProduct) {
-        await apiClient.put(
-          `/api/products/update/${editingProduct}`,
-          payload,
-          { withCredentials: true }
-        );
+        await apiClient.put(`/api/products/update/${editingProduct}`, payload, {
+          withCredentials: true,
+        });
         setActionMessage("Product updated successfully!");
       } else {
-        await apiClient.post(
-          "/api/products/add",
-          payload,
-          { withCredentials: true }
-        );
+        await apiClient.post("/api/products/add", payload, {
+          withCredentials: true,
+        });
         setActionMessage("Product added successfully!");
       }
       await fetchProducts();
@@ -198,7 +210,7 @@ export default function ProductManagementScreen() {
       unit: product.unit || "kg",
       quantity: String(product.quantity || ""),
       category: product.category || "",
-      imageUrl: product.images?.[0] || ""
+      imageUrl: product.images?.[0] || "",
     });
     setImagePreview(product.images?.[0] || null);
     setIsFormVisible(true);
@@ -210,24 +222,25 @@ export default function ProductManagementScreen() {
       "Are you sure you want to delete this product listing?",
       [
         { text: "Cancel", style: "cancel" },
-        { 
-          text: "Delete", 
-          style: "destructive", 
+        {
+          text: "Delete",
+          style: "destructive",
           onPress: async () => {
             try {
               setActionMessage("");
-              await apiClient.delete(
-                `/api/products/delete/${productId}`,
-                { withCredentials: true }
-              );
+              await apiClient.delete(`/api/products/delete/${productId}`, {
+                withCredentials: true,
+              });
               setActionMessage("Product deleted successfully!");
               fetchProducts();
             } catch (err) {
               const msg =
-                err?.response?.data?.message || err.message || "Failed to delete product";
+                err?.response?.data?.message ||
+                err.message ||
+                "Failed to delete product";
               setActionMessage(msg);
             }
-          }
+          },
         },
       ]
     );
@@ -271,7 +284,11 @@ export default function ProductManagementScreen() {
             }
           }}
         >
-          <Feather name={isFormVisible && !editingProduct ? "x" : "plus"} size={18} color={COLORS.surface} />
+          <Feather
+            name={isFormVisible && !editingProduct ? "x" : "plus"}
+            size={18}
+            color={COLORS.surface}
+          />
           <Text style={styles.addButtonText}>
             {isFormVisible && !editingProduct ? "Close" : "Add Product"}
           </Text>
@@ -287,7 +304,14 @@ export default function ProductManagementScreen() {
       />
 
       {actionMessage ? (
-        <Text style={[styles.actionMessage, actionMessage.includes("Error") || actionMessage.includes("Failed") ? {color: COLORS.danger} : {color: COLORS.success}]}>
+        <Text
+          style={[
+            styles.actionMessage,
+            actionMessage.includes("Error") || actionMessage.includes("Failed")
+              ? { color: COLORS.danger }
+              : { color: COLORS.success },
+          ]}
+        >
           {actionMessage}
         </Text>
       ) : null}
@@ -299,7 +323,7 @@ export default function ProductManagementScreen() {
           </Text>
 
           {/* Form Fields */}
-          
+
           <View style={styles.formRow}>
             <Text style={styles.label}>Product Name *</Text>
             <TextInput
@@ -313,20 +337,24 @@ export default function ProductManagementScreen() {
 
           <View style={styles.formRow}>
             <Text style={styles.label}>Category</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRowContainer}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.chipRowContainer}
+            >
               {CATEGORY_OPTIONS.map((cat) => (
                 <TouchableOpacity
                   key={cat}
                   style={[
                     styles.chip,
-                    form.category === cat && styles.chipActive
+                    form.category === cat && styles.chipActive,
                   ]}
                   onPress={() => handleChange("category", cat)}
                 >
                   <Text
                     style={[
                       styles.chipText,
-                      form.category === cat && styles.chipTextActive
+                      form.category === cat && styles.chipTextActive,
                     ]}
                   >
                     {cat}
@@ -350,20 +378,21 @@ export default function ProductManagementScreen() {
 
           <View style={styles.formRow}>
             <Text style={styles.label}>Unit</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRowContainer}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.chipRowContainer}
+            >
               {UNIT_OPTIONS.map((unit) => (
                 <TouchableOpacity
                   key={unit}
-                  style={[
-                    styles.chip,
-                    form.unit === unit && styles.chipActive
-                  ]}
+                  style={[styles.chip, form.unit === unit && styles.chipActive]}
                   onPress={() => handleChange("unit", unit)}
                 >
                   <Text
                     style={[
                       styles.chipText,
-                      form.unit === unit && styles.chipTextActive
+                      form.unit === unit && styles.chipTextActive,
                     ]}
                   >
                     {unit}
@@ -400,22 +429,39 @@ export default function ProductManagementScreen() {
 
           <View style={styles.formRow}>
             <Text style={styles.label}>Product Image</Text>
-            <TouchableOpacity style={styles.imagePickerButton} onPress={handleImagePick} disabled={loading}>
+            <TouchableOpacity
+              style={styles.imagePickerButton}
+              onPress={handleImagePick}
+              disabled={loading}
+            >
               <Text style={styles.imagePickerButtonText}>
-                {form.imageUrl || imagePreview ? "Change Image" : "Select Image"}
+                {form.imageUrl || imagePreview
+                  ? "Change Image"
+                  : "Select Image"}
               </Text>
               <Feather name="upload-cloud" size={16} color={COLORS.surface} />
             </TouchableOpacity>
             {(imagePreview || form.imageUrl) && (
-              <Image source={{ uri: imagePreview || form.imageUrl }} style={styles.imagePreview} />
+              <Image
+                source={{ uri: imagePreview || form.imageUrl }}
+                style={styles.imagePreview}
+              />
             )}
           </View>
 
           <View style={styles.formButtons}>
-            <TouchableOpacity style={styles.cancelButton} onPress={resetForm} disabled={loading}>
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={resetForm}
+              disabled={loading}
+            >
               <Text style={styles.cancelText}>Cancel</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.saveButton} onPress={handleSubmit} disabled={loading}>
+            <TouchableOpacity
+              style={styles.saveButton}
+              onPress={handleSubmit}
+              disabled={loading}
+            >
               <Text style={styles.saveText}>
                 {editingProduct ? "Update Listing" : "Save Product"}
               </Text>
@@ -431,7 +477,10 @@ export default function ProductManagementScreen() {
         renderItem={({ item }) => (
           <View style={styles.productCard}>
             {item.images?.[0] && (
-              <Image source={{ uri: item.images[0] }} style={styles.cardImage} />
+              <Image
+                source={{ uri: item.images[0] }}
+                style={styles.cardImage}
+              />
             )}
             <View style={styles.productDetails}>
               <View style={styles.productHeader}>
@@ -451,14 +500,17 @@ export default function ProductManagementScreen() {
               </View>
               <View style={styles.actionsRow}>
                 <TouchableOpacity
-                  style={[styles.editButton, { flexDirection: 'row', gap: 6 }]}
+                  style={[styles.editButton, { flexDirection: "row", gap: 6 }]}
                   onPress={() => startEdit(item)}
                 >
                   <Feather name="edit" size={14} color={COLORS.primary} />
                   <Text style={styles.editText}>Edit</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.deleteButton, { flexDirection: 'row', gap: 6 }]}
+                  style={[
+                    styles.deleteButton,
+                    { flexDirection: "row", gap: 6 },
+                  ]}
                   onPress={() => deleteProduct(item._id)}
                 >
                   <Feather name="trash-2" size={14} color={COLORS.danger} />
@@ -486,9 +538,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     // IMPROVEMENT: Soft, branded background color
-    backgroundColor: '#F0FFF0', 
+    backgroundColor: "#F0FFF0",
     paddingHorizontal: 16,
-    paddingTop: 16
+    paddingTop: 16,
   },
   // --- Header and Search ---
   headerRow: {
@@ -500,15 +552,15 @@ const styles = StyleSheet.create({
   heading: {
     fontSize: 24,
     fontWeight: "800",
-    color: COLORS.primaryDark
+    color: COLORS.primaryDark,
   },
   addButton: {
     backgroundColor: COLORS.primary,
     borderRadius: RADIUS.pill,
     paddingHorizontal: 16,
     paddingVertical: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
     ...SHADOWS.soft,
   },
@@ -532,7 +584,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     marginBottom: 12,
-    textAlign: 'center',
+    textAlign: "center",
   },
   // --- Form Card ---
   formCard: {
@@ -556,7 +608,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.mutedDark,
     marginBottom: 6,
-    fontWeight: "600"
+    fontWeight: "600",
   },
   input: {
     borderWidth: 1,
@@ -565,7 +617,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     fontSize: 15,
-    backgroundColor: '#F9F9F9', // Slight contrast background
+    backgroundColor: "#F9F9F9", // Slight contrast background
     color: COLORS.mutedDark,
   },
   // --- Chips (Category/Unit) FIX ---
@@ -574,8 +626,8 @@ const styles = StyleSheet.create({
   },
   chip: {
     // FIX: Optimized padding for tighter, visually balanced chips
-    paddingHorizontal: 12, 
-    paddingVertical: 6, 
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: RADIUS.pill,
     backgroundColor: COLORS.border, // Inactive background
     marginRight: 8,
@@ -601,7 +653,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.pill,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    flexDirection: 'row',
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
@@ -610,7 +662,7 @@ const styles = StyleSheet.create({
   imagePickerButtonText: {
     color: COLORS.surface,
     fontWeight: "700",
-    fontSize: 14
+    fontSize: 14,
   },
   imagePreview: {
     width: "100%",
@@ -654,8 +706,8 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.md,
     marginBottom: 12,
     ...SHADOWS.soft,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     padding: 10,
     gap: 12,
     borderLeftWidth: 5,
@@ -665,7 +717,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: RADIUS.sm,
-    resizeMode: 'cover',
+    resizeMode: "cover",
   },
   productDetails: {
     flex: 1,
@@ -689,7 +741,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: RADIUS.pill,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   productDescription: {
     marginTop: 4,
@@ -721,7 +773,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: RADIUS.pill,
     borderWidth: 1,
-    borderColor: COLORS.primary
+    borderColor: COLORS.primary,
   },
   editText: {
     color: COLORS.primary,
@@ -745,50 +797,50 @@ const styles = StyleSheet.create({
   // --- Utility Styles ---
   emptyState: {
     paddingVertical: 40,
-    alignItems: "center"
+    alignItems: "center",
   },
   emptyTitle: {
     fontSize: 18,
     fontWeight: "700",
     color: COLORS.primaryDark,
-    marginBottom: 4
+    marginBottom: 4,
   },
   emptyText: {
     fontSize: 14,
     color: COLORS.muted,
-    textAlign: "center"
+    textAlign: "center",
   },
   centered: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     padding: 24,
-    backgroundColor: '#F0FFF0',
+    backgroundColor: "#F0FFF0",
   },
   loadingText: {
     marginTop: 8,
-    color: COLORS.mutedDark
+    color: COLORS.mutedDark,
   },
   errorTitle: {
     fontSize: 18,
     fontWeight: "700",
     color: COLORS.danger,
-    marginBottom: 6
+    marginBottom: 6,
   },
   errorText: {
     fontSize: 14,
     color: COLORS.mutedDark,
     textAlign: "center",
-    marginBottom: 12
+    marginBottom: 12,
   },
   retryButton: {
     paddingHorizontal: 18,
     paddingVertical: 8,
     borderRadius: RADIUS.pill,
-    backgroundColor: COLORS.primary
+    backgroundColor: COLORS.primary,
   },
   retryText: {
     color: COLORS.surface,
-    fontWeight: "600"
+    fontWeight: "600",
   },
 });

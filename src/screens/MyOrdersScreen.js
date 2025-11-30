@@ -54,13 +54,25 @@ export default function MyOrdersScreen({ navigation }) {
     try {
       setLoading(true);
       setError("");
-      const res = await apiClient.get(
-        "/api/v1/order/user-orders",
-        { withCredentials: true }
-      );
-      setOrders(res.data?.orders || []);
+      const res = await apiClient.get("/api/v1/order/user-orders", {
+        withCredentials: true,
+      });
+      const data = res.data || {};
+      // Handle both response structures: { orders: [...] } or { success: true, orders: [...] }
+      if (data.success !== undefined) {
+        // Response has success field
+        if (data.success) {
+          setOrders(data.orders || []);
+        } else {
+          setError(data.message || "Failed to load orders");
+        }
+      } else {
+        // Direct orders array or object with orders
+        setOrders(data.orders || data || []);
+      }
     } catch (err) {
-      const msg = err?.response?.data?.message || err.message || "Failed to load orders";
+      const msg =
+        err?.response?.data?.message || err.message || "Failed to load orders";
       setError(msg);
     } finally {
       setLoading(false);
@@ -72,33 +84,46 @@ export default function MyOrdersScreen({ navigation }) {
   }, []);
 
   const formatDate = (dateString) =>
-    dateString ? new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : "N/A";
+    dateString
+      ? new Date(dateString).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        })
+      : "N/A";
 
   const formatCurrency = (amount) =>
     `Rs. ${Number(amount || 0).toLocaleString()}`;
 
   const cancelOrder = async (orderId) => {
     Alert.alert(
-        "Confirm Cancellation",
-        "Are you sure you want to cancel this order? This action cannot be undone.",
-        [
-            { text: "No", style: "cancel" },
-            { text: "Yes, Cancel", style: "destructive", onPress: async () => {
-                try {
-                    setActionMessage("");
-                    await apiClient.put(
-                      `/api/v1/order/cancel/${orderId}`,
-                      {},
-                      { withCredentials: true }
-                    );
-                    setActionMessage("Order successfully cancelled.");
-                    fetchOrders();
-                  } catch (err) {
-                    const msg = err?.response?.data?.message || err.message || "Failed to cancel order";
-                    setActionMessage(msg);
-                  }
-            }}
-        ]
+      "Confirm Cancellation",
+      "Are you sure you want to cancel this order? This action cannot be undone.",
+      [
+        { text: "No", style: "cancel" },
+        {
+          text: "Yes, Cancel",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setActionMessage("");
+              await apiClient.patch(
+                `/api/v1/order/${orderId}/cancel`,
+                {},
+                { withCredentials: true }
+              );
+              setActionMessage("Order successfully cancelled.");
+              fetchOrders();
+            } catch (err) {
+              const msg =
+                err?.response?.data?.message ||
+                err.message ||
+                "Failed to cancel order";
+              setActionMessage(msg);
+            }
+          },
+        },
+      ]
     );
   };
 
@@ -107,12 +132,16 @@ export default function MyOrdersScreen({ navigation }) {
       productId: product.productId?._id,
       productName: product.productId?.name || "Product",
       rating: 0,
-      comment: ""
+      comment: "",
     });
   };
 
   const submitReview = async () => {
-    if (!reviewForm.productId || reviewForm.rating === 0 || !reviewForm.comment.trim()) {
+    if (
+      !reviewForm.productId ||
+      reviewForm.rating === 0 ||
+      !reviewForm.comment.trim()
+    ) {
       setActionMessage("Please provide a rating and comment.");
       return;
     }
@@ -123,7 +152,7 @@ export default function MyOrdersScreen({ navigation }) {
         {
           productId: reviewForm.productId,
           rating: reviewForm.rating,
-          comment: reviewForm.comment.trim()
+          comment: reviewForm.comment.trim(),
         },
         { withCredentials: true }
       );
@@ -131,17 +160,20 @@ export default function MyOrdersScreen({ navigation }) {
       setReviewForm(emptyReview);
       fetchOrders();
     } catch (err) {
-      const msg = err?.response?.data?.message || err.message || "Failed to submit review";
+      const msg =
+        err?.response?.data?.message ||
+        err.message ||
+        "Failed to submit review";
       setActionMessage(msg);
     }
   };
 
   // --- NEW: Role-based navigation for "Continue Shopping" ---
   const handleContinueShopping = () => {
-      // Assuming this screen is primarily reached by the Buyer/User role.
-      // If used by a Farmer/Supplier to buy, they would navigate to "FarmerProducts".
-      // We will default to "BuyerProducts" which is the general marketplace browse screen.
-      navigation?.navigate?.("BuyerProducts"); 
+    // Assuming this screen is primarily reached by the Buyer/User role.
+    // If used by a Farmer/Supplier to buy, they would navigate to "FarmerProducts".
+    // We will default to "BuyerProducts" which is the general marketplace browse screen.
+    navigation?.navigate?.("BuyerProducts");
   };
   // --- END NEW LOGIC ---
 
@@ -179,7 +211,15 @@ export default function MyOrdersScreen({ navigation }) {
       </View>
 
       {actionMessage ? (
-        <Text style={[styles.actionMessage, actionMessage.includes("cancelled") || actionMessage.includes("Failed") ? styles.actionMessageDanger : styles.actionMessageSuccess]}>
+        <Text
+          style={[
+            styles.actionMessage,
+            actionMessage.includes("cancelled") ||
+            actionMessage.includes("Failed")
+              ? styles.actionMessageDanger
+              : styles.actionMessageSuccess,
+          ]}
+        >
           {actionMessage}
         </Text>
       ) : null}
@@ -189,36 +229,55 @@ export default function MyOrdersScreen({ navigation }) {
         keyExtractor={(item) => item._id}
         contentContainerStyle={{ paddingBottom: 16 }}
         renderItem={({ item }) => {
-          const statusStyle = getStatusStyles(item.status);
-          const canCancel = item.status === "pending" || item.status === "processing";
+          const orderStatus = item.orderStatus || item.status || "pending";
+          const statusStyle = getStatusStyles(orderStatus);
+          const canCancel =
+            orderStatus === "pending" ||
+            orderStatus === "processing" ||
+            orderStatus === "confirmed";
 
           return (
-            <TouchableOpacity 
-                style={styles.card}
-                // Navigate to OrderDetail screen on card press
-                onPress={() => navigation.navigate("OrderDetail", { orderId: item._id })}
-            >
+            <View style={styles.card}>
               {/* Order Header */}
               <View style={styles.cardHeader}>
                 <View>
                   <Text style={styles.orderId}>
-                    ID: <Text style={{color: COLORS.primaryDark}}>{item._id?.slice(-6).toUpperCase()}</Text>
+                    ID:{" "}
+                    <Text style={{ color: COLORS.primaryDark }}>
+                      {item._id?.slice(-6).toUpperCase()}
+                    </Text>
                   </Text>
-                  <Text style={styles.dateText}>Placed on {formatDate(item.createdAt)}</Text>
+                  <Text style={styles.dateText}>
+                    Placed on {formatDate(item.createdAt)}
+                  </Text>
                 </View>
-                <View style={[styles.statusBadge, { backgroundColor: statusStyle.backgroundColor }]}>
-                  <Text style={[styles.statusBadgeText, { color: statusStyle.color }]}>
-                    {item.status?.toUpperCase()}
+                <View
+                  style={[
+                    styles.statusBadge,
+                    { backgroundColor: statusStyle.backgroundColor },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.statusBadgeText,
+                      { color: statusStyle.color },
+                    ]}
+                  >
+                    {orderStatus?.toUpperCase()}
                   </Text>
                 </View>
               </View>
 
               {/* Total Amount */}
-              <Text style={styles.amountText}>{formatCurrency(item.totalPrice)}</Text>
+              <Text style={styles.amountText}>
+                {formatCurrency(item.totalPrice)}
+              </Text>
 
               {/* Items Section */}
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Items Purchased ({item.products?.length || 0})</Text>
+                <Text style={styles.sectionTitle}>
+                  Items Purchased ({item.products?.length || 0})
+                </Text>
                 {item.products?.map((product) => (
                   <View key={product._id} style={styles.productRow}>
                     <View style={{ flex: 1 }}>
@@ -226,10 +285,26 @@ export default function MyOrdersScreen({ navigation }) {
                         {product.productId?.name || "Product"}
                       </Text>
                       <Text style={styles.productMeta}>
-                        {product.quantity} x {formatCurrency(product.productId?.price)} / {product.productId?.unit}
+                        {product.quantity} x{" "}
+                        {formatCurrency(
+                          product.productId?.price || product.price
+                        )}{" "}
+                        / {product.productId?.unit || product.unit}
                       </Text>
+                      <Text style={styles.productMeta}>
+                        Seller:{" "}
+                        {product.farmerId?.name ||
+                          product.supplierId?.name ||
+                          "N/A"}
+                      </Text>
+                      {product.status && (
+                        <Text style={styles.productMeta}>
+                          Status: {product.status?.toUpperCase()}
+                        </Text>
+                      )}
                     </View>
-                    {item.status === "delivered" && (
+                    {(orderStatus === "delivered" ||
+                      item.status === "delivered") && (
                       <TouchableOpacity
                         style={styles.reviewButton}
                         onPress={() => openReview(product)}
@@ -245,7 +320,8 @@ export default function MyOrdersScreen({ navigation }) {
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Shipping Address</Text>
                 <Text style={styles.sectionText}>
-                  {item.shippingAddress?.street}, {item.shippingAddress?.city}, {item.shippingAddress?.zipCode}
+                  {item.shippingAddress?.street}, {item.shippingAddress?.city},{" "}
+                  {item.shippingAddress?.zipCode}
                 </Text>
                 <Text style={styles.sectionText}>
                   Phone: {item.shippingAddress?.phoneNumber || "N/A"}
@@ -261,12 +337,17 @@ export default function MyOrdersScreen({ navigation }) {
                   <Text style={styles.cancelButtonText}>Cancel Order</Text>
                 </TouchableOpacity>
               )}
-            </TouchableOpacity>
+            </View>
           );
         }}
         ListEmptyComponent={
           <View style={styles.emptyState}>
-             <Ionicons name="cart-outline" size={36} color={COLORS.muted} style={{marginBottom: 10}}/>
+            <Ionicons
+              name="cart-outline"
+              size={36}
+              color={COLORS.muted}
+              style={{ marginBottom: 10 }}
+            />
             <Text style={styles.emptyTitle}>No orders yet</Text>
             <Text style={styles.emptyText}>
               Place your first order to see it here.
@@ -291,9 +372,15 @@ export default function MyOrdersScreen({ navigation }) {
             {[1, 2, 3, 4, 5].map((star) => (
               <TouchableOpacity
                 key={star}
-                onPress={() => setReviewForm((prev) => ({ ...prev, rating: star }))}
+                onPress={() =>
+                  setReviewForm((prev) => ({ ...prev, rating: star }))
+                }
               >
-                <Text style={reviewForm.rating >= star ? styles.starActive : styles.star}>
+                <Text
+                  style={
+                    reviewForm.rating >= star ? styles.starActive : styles.star
+                  }
+                >
                   ★
                 </Text>
               </TouchableOpacity>
@@ -304,7 +391,9 @@ export default function MyOrdersScreen({ navigation }) {
             style={[styles.input, { height: 70, textAlignVertical: "top" }]}
             multiline
             value={reviewForm.comment}
-            onChangeText={(t) => setReviewForm((prev) => ({ ...prev, comment: t }))}
+            onChangeText={(t) =>
+              setReviewForm((prev) => ({ ...prev, comment: t }))
+            }
             placeholder="Share your thoughts on the product..."
             placeholderTextColor={COLORS.muted}
           />
@@ -320,7 +409,7 @@ export default function MyOrdersScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F0FFF0', 
+    backgroundColor: "#F0FFF0",
     paddingHorizontal: 16,
     paddingTop: 16,
   },
@@ -328,7 +417,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 16, 
+    marginBottom: 16,
   },
   heading: {
     fontSize: 26,
@@ -338,7 +427,7 @@ const styles = StyleSheet.create({
   primaryButton: {
     backgroundColor: COLORS.primary,
     borderRadius: RADIUS.pill,
-    paddingHorizontal: 16, 
+    paddingHorizontal: 16,
     paddingVertical: 8,
     ...SHADOWS.soft,
   },
@@ -355,27 +444,27 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     textAlign: "center",
     borderLeftWidth: 5,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   actionMessageSuccess: {
-      color: COLORS.success,
-      backgroundColor: COLORS.accent,
-      borderColor: COLORS.success,
+    color: COLORS.success,
+    backgroundColor: COLORS.accent,
+    borderColor: COLORS.success,
   },
   actionMessageDanger: {
-      color: COLORS.danger,
-      backgroundColor: COLORS.danger,
-      borderColor: COLORS.danger,
-      opacity: 0.8,
+    color: COLORS.danger,
+    backgroundColor: COLORS.danger,
+    borderColor: COLORS.danger,
+    opacity: 0.8,
   },
   // --- Order Card ---
   card: {
     backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.lg, 
-    padding: 20, 
+    borderRadius: RADIUS.lg,
+    padding: 20,
     marginBottom: 16,
     ...SHADOWS.card,
-    borderLeftWidth: 6, 
+    borderLeftWidth: 6,
     borderColor: COLORS.primary,
   },
   cardHeader: {
@@ -408,10 +497,10 @@ const styles = StyleSheet.create({
   statusBadgeText: {
     fontSize: 12,
     fontWeight: "800",
-    color: COLORS.surface, 
+    color: COLORS.surface,
   },
   amountText: {
-    fontSize: 22, 
+    fontSize: 22,
     fontWeight: "900",
     color: COLORS.primaryDark,
     marginTop: 5,
@@ -456,7 +545,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: RADIUS.pill,
-    backgroundColor: COLORS.info, 
+    backgroundColor: COLORS.info,
     alignSelf: "flex-start",
     marginLeft: 10,
   },
@@ -469,7 +558,7 @@ const styles = StyleSheet.create({
   cancelButton: {
     marginTop: 15,
     borderRadius: RADIUS.pill,
-    paddingVertical: 14, 
+    paddingVertical: 14,
     alignItems: "center",
     backgroundColor: COLORS.danger,
     ...SHADOWS.soft,
@@ -504,7 +593,7 @@ const styles = StyleSheet.create({
   },
   // --- Review Card (Modal) ---
   reviewCard: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
@@ -522,37 +611,37 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     paddingBottom: 10,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border
+    borderBottomColor: COLORS.border,
   },
   reviewTitle: {
     fontSize: 20,
     fontWeight: "800",
-    color: COLORS.primaryDark
+    color: COLORS.primaryDark,
   },
   cancelReviewText: {
     color: COLORS.danger,
     fontWeight: "700",
-    fontSize: 14
+    fontSize: 14,
   },
   label: {
     fontSize: 14,
     color: COLORS.mutedDark,
     marginBottom: 6,
-    fontWeight: "700"
+    fontWeight: "700",
   },
   ratingRow: {
     flexDirection: "row",
-    marginBottom: 15
+    marginBottom: 15,
   },
   star: {
-    fontSize: 32, 
+    fontSize: 32,
     color: COLORS.border,
-    marginRight: 10
+    marginRight: 10,
   },
   starActive: {
     fontSize: 32,
-    color: COLORS.warning, 
-    marginRight: 10
+    color: COLORS.warning,
+    marginRight: 10,
   },
   input: {
     borderWidth: 1,
@@ -563,42 +652,42 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surface,
     fontSize: 15,
     color: COLORS.mutedDark,
-    marginBottom: 15
+    marginBottom: 15,
   },
   // --- Loading/Error/Retry ---
   centered: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: '#F0FFF0',
-    padding: 24
+    backgroundColor: "#F0FFF0",
+    padding: 24,
   },
   loadingText: {
     marginTop: 10,
     fontSize: 15,
-    color: COLORS.mutedDark
+    color: COLORS.mutedDark,
   },
   errorTitle: {
     fontSize: 20,
     fontWeight: "700",
     color: COLORS.danger,
-    marginBottom: 8
+    marginBottom: 8,
   },
   errorText: {
     fontSize: 15,
     color: COLORS.mutedDark,
     textAlign: "center",
-    marginBottom: 15
+    marginBottom: 15,
   },
   retryButton: {
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: RADIUS.pill,
-    backgroundColor: COLORS.primary
+    backgroundColor: COLORS.primary,
   },
   retryText: {
     color: COLORS.surface,
     fontWeight: "700",
-    fontSize: 15
-  }
+    fontSize: 15,
+  },
 });

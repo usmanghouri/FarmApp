@@ -1,23 +1,24 @@
 import React, { useState, useEffect } from "react";
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  ActivityIndicator, 
-  ScrollView, 
-  TextInput, 
-  TouchableOpacity, 
-  Alert, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  ActivityIndicator,
+  ScrollView,
+  TextInput,
+  TouchableOpacity,
+  Alert,
   Image,
-  SafeAreaView // Added for better mobile layout
+  SafeAreaView, // Added for better mobile layout
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { apiClient } from "../api/client";
 import { COLORS, SHADOWS, RADIUS } from "../styles/theme"; // Assuming theme is available
-import { Feather, Ionicons } from '@expo/vector-icons';
+import { Feather, Ionicons } from "@expo/vector-icons";
 
-const CLOUDINARY_UPLOAD_PRESET = "FarmConnect";
+// Cloudinary configuration
 const CLOUDINARY_CLOUD_NAME = "dn5edjpzg";
+const CLOUDINARY_UPLOAD_PRESET = "FarmConnect";
 
 export default function SupplierProfileScreen({ navigation }) {
   const [user, setUser] = useState(null);
@@ -41,16 +42,21 @@ export default function SupplierProfileScreen({ navigation }) {
     setLoading(true);
     try {
       // Assuming /api/suppliers/me is the correct endpoint
-      const response = await apiClient.get("/api/suppliers/me", { withCredentials: true }); 
-      setUser(response.data.user);
-      setFormData({
-        name: response.data.user.name,
-        email: response.data.user.email,
-        address: response.data.user.address || "",
-        phone: response.data.user.phone || "",
-        profileImage: response.data.user.profileImage || "",
+      const response = await apiClient.get("/api/suppliers/me", {
+        withCredentials: true,
       });
-      setImagePreview(response.data.user.profileImage || null);
+      const userData = response.data.user || {};
+      setUser(userData);
+      // Backend returns 'img' field (matching web version)
+      const imageUrl = userData.img || userData.profileImage || "";
+      setFormData({
+        name: userData.name || "",
+        email: userData.email || "",
+        address: userData.address || "",
+        phone: userData.phone || "",
+        profileImage: imageUrl, // Store as profileImage internally, send as 'img' to backend
+      });
+      setImagePreview(imageUrl || null);
     } catch (err) {
       console.error("Failed to fetch profile:", err);
       setError(err.response?.data?.message || "Failed to load profile.");
@@ -62,10 +68,14 @@ export default function SupplierProfileScreen({ navigation }) {
   const handleImagePick = async () => {
     try {
       // Request permission
-      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      
+      const permissionResult =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+
       if (!permissionResult.granted) {
-        Alert.alert("Permission Required", "Please allow access to your photo library to update profile picture.");
+        Alert.alert(
+          "Permission Required",
+          "Please allow access to your photo library to update profile picture."
+        );
         return;
       }
 
@@ -90,35 +100,44 @@ export default function SupplierProfileScreen({ navigation }) {
   const uploadImage = async (uri) => {
     try {
       setLoading(true);
-      
-      // Create form data
-      const uploadFormData = new FormData();
-      const filename = uri.split('/').pop();
-      const match = /\.(\w+)$/.exec(filename);
-      const type = match ? `image/${match[1]}` : 'image/jpeg';
 
-      uploadFormData.append('image', {
-        uri,
-        name: filename,
-        type,
+      // Upload to Cloudinary first (like web version)
+      const formData = new FormData();
+      formData.append("file", {
+        uri: uri,
+        name: "upload.jpg",
+        type: "image/jpeg",
       });
+      formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
 
-      // Upload to server
-      const response = await apiClient.post('/api/suppliers/upload-image', uploadFormData, {
-        withCredentials: true,
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      const response = await fetch(
+        `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+        {
+          method: "POST",
+          body: formData,
+          // Don't set Content-Type manually - React Native will set it with boundary
+        }
+      );
 
-      if (response.data?.imageUrl) {
-        setFormData((prev) => ({ ...prev, profileImage: response.data.imageUrl }));
-        Alert.alert("Success", "Profile picture updated successfully!");
-        fetchProfile();
+      if (!response.ok) {
+        throw new Error(`Upload failed with status ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.secure_url) {
+        // Update form with Cloudinary URL
+        setFormData((prev) => ({
+          ...prev,
+          profileImage: data.secure_url,
+        }));
+        Alert.alert("Success", "Image uploaded! Click Save to update profile.");
+      } else {
+        throw new Error(data.error?.message || "Failed to get image URL");
       }
     } catch (error) {
       console.error("Image upload error:", error);
-      Alert.alert("Error", error?.response?.data?.message || "Failed to upload image");
+      Alert.alert("Error", error?.message || "Failed to upload image");
     } finally {
       setLoading(false);
     }
@@ -127,15 +146,27 @@ export default function SupplierProfileScreen({ navigation }) {
   const handleUpdateProfile = async () => {
     setLoading(true);
     try {
-      const payload = { ...formData };
-      // Assuming /api/v1/auth/updateProfile is the generic update endpoint
-      await apiClient.put("/api/v1/auth/updateProfile", payload, { withCredentials: true }); 
+      // Map formData to match web version's expected format
+      const payload = {
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        address: formData.address,
+        img: formData.profileImage || "", // Use 'img' field as expected by backend
+      };
+
+      await apiClient.put("/api/suppliers/update", payload, {
+        withCredentials: true,
+      });
       Alert.alert("Success", "Profile updated successfully!");
       setIsEditing(false);
       fetchProfile();
     } catch (err) {
       console.error("Failed to update profile:", err);
-      Alert.alert("Error", err.response?.data?.message || "Failed to update profile.");
+      Alert.alert(
+        "Error",
+        err.response?.data?.message || "Failed to update profile."
+      );
     } finally {
       setLoading(false);
     }
@@ -146,35 +177,36 @@ export default function SupplierProfileScreen({ navigation }) {
   };
 
   const handleCancelEdit = () => {
-      setIsEditing(false);
-      // Reset form data to the original fetched user data
-      setFormData({
-          name: user.name,
-          email: user.email,
-          address: user.address || "",
-          phone: user.phone || "",
-          profileImage: user.profileImage || "",
-      });
+    setIsEditing(false);
+    // Reset form data to the original fetched user data
+    const imageUrl = user.img || user.profileImage || "";
+    setFormData({
+      name: user.name || "",
+      email: user.email || "",
+      address: user.address || "",
+      phone: user.phone || "",
+      profileImage: imageUrl,
+    });
+    setImagePreview(imageUrl || null);
   };
 
   // --- NEW LOGOUT FUNCTION ---
   const handleLogout = () => {
-    Alert.alert(
-      "Logout",
-      "Are you sure you want to log out?",
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Logout", onPress: async () => {
-             // In a real app, call a global logout function to clear AuthContext/tokens
-             try {
-                await apiClient.get("/api/suppliers/logout"); 
-             } catch (e) {
-                 console.error("Logout API failed:", e);
-             }
-            navigation.navigate("Landing"); // Navigate to Landing page after logout
-          }},
-      ]
-    );
+    Alert.alert("Logout", "Are you sure you want to log out?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Logout",
+        onPress: async () => {
+          // In a real app, call a global logout function to clear AuthContext/tokens
+          try {
+            await apiClient.get("/api/suppliers/logout");
+          } catch (e) {
+            console.error("Logout API failed:", e);
+          }
+          navigation.navigate("Landing"); // Navigate to Landing page after logout
+        },
+      },
+    ]);
   };
   // --- END NEW LOGOUT FUNCTION ---
 
@@ -195,7 +227,7 @@ export default function SupplierProfileScreen({ navigation }) {
     );
   }
 
-  const avatarUri = imagePreview || "https://i.ibb.co/0jqp8Qf/avatar.png"; 
+  const avatarUri = imagePreview || "https://i.ibb.co/0jqp8Qf/avatar.png";
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background }}>
@@ -205,50 +237,68 @@ export default function SupplierProfileScreen({ navigation }) {
         {user && (
           <View style={styles.profileCard}>
             <View style={styles.imageUploadContainer}>
-              <Image
-                source={{ uri: avatarUri }}
-                style={styles.profileImage}
-              />
+              <Image source={{ uri: avatarUri }} style={styles.profileImage} />
               {isEditing && (
-                <TouchableOpacity style={styles.imagePickerButton} onPress={handleImagePick} disabled={loading}>
-                    <Feather name="camera" size={18} color={COLORS.surface} />
+                <TouchableOpacity
+                  style={styles.imagePickerButton}
+                  onPress={handleImagePick}
+                  disabled={loading}
+                >
+                  <Feather name="camera" size={18} color={COLORS.surface} />
                   <Text style={styles.imagePickerButtonText}>Change Image</Text>
                 </TouchableOpacity>
               )}
             </View>
 
             {/* Display/Edit Fields */}
-            {['name', 'email', 'phone', 'address'].map(field => (
-                <View key={field}>
-                    <Text style={styles.label}>{field.charAt(0).toUpperCase() + field.slice(1)}:</Text>
-                    {isEditing ? (
-                        <TextInput
-                            style={styles.input}
-                            value={formData[field]}
-                            onChangeText={(text) => handleChange(field, text)}
-                            keyboardType={field === 'phone' ? "phone-pad" : (field === 'email' ? 'email-address' : 'default')}
-                            editable={field !== 'email'} 
-                            placeholderTextColor={COLORS.muted}
-                        />
-                    ) : (
-                        <Text style={styles.value}>{user[field] || "N/A"}</Text>
-                    )}
-                </View>
+            {["name", "email", "phone", "address"].map((field) => (
+              <View key={field}>
+                <Text style={styles.label}>
+                  {field.charAt(0).toUpperCase() + field.slice(1)}:
+                </Text>
+                {isEditing ? (
+                  <TextInput
+                    style={styles.input}
+                    value={formData[field]}
+                    onChangeText={(text) => handleChange(field, text)}
+                    keyboardType={
+                      field === "phone"
+                        ? "phone-pad"
+                        : field === "email"
+                        ? "email-address"
+                        : "default"
+                    }
+                    editable={field !== "email"}
+                    placeholderTextColor={COLORS.muted}
+                  />
+                ) : (
+                  <Text style={styles.value}>{user[field] || "N/A"}</Text>
+                )}
+              </View>
             ))}
 
             {/* Action Buttons */}
             <View style={styles.buttonContainer}>
               {isEditing ? (
                 <>
-                  <TouchableOpacity style={styles.saveButton} onPress={handleUpdateProfile}>
+                  <TouchableOpacity
+                    style={styles.saveButton}
+                    onPress={handleUpdateProfile}
+                  >
                     <Text style={styles.buttonText}>Save Changes</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.cancelButton} onPress={handleCancelEdit}>
+                  <TouchableOpacity
+                    style={styles.cancelButton}
+                    onPress={handleCancelEdit}
+                  >
                     <Text style={styles.buttonText}>Cancel</Text>
                   </TouchableOpacity>
                 </>
               ) : (
-                <TouchableOpacity style={styles.editButton} onPress={() => setIsEditing(true)}>
+                <TouchableOpacity
+                  style={styles.editButton}
+                  onPress={() => setIsEditing(true)}
+                >
                   <Text style={styles.buttonText}>Edit Profile</Text>
                 </TouchableOpacity>
               )}
@@ -271,19 +321,19 @@ const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
     padding: 20,
-    backgroundColor: '#F0FFF0', 
+    backgroundColor: "#F0FFF0",
   },
   heading: {
     fontSize: 26,
     fontWeight: "800",
     color: COLORS.primaryDark,
-    marginBottom: 20
+    marginBottom: 20,
   },
   centered: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: '#F0FFF0'
+    backgroundColor: "#F0FFF0",
   },
   loadingText: {
     marginTop: 10,
@@ -293,11 +343,11 @@ const styles = StyleSheet.create({
   errorText: {
     fontSize: 16,
     color: COLORS.danger, // Themed error color
-    textAlign: "center"
+    textAlign: "center",
   },
   // --- Profile Card ---
   profileCard: {
-    backgroundColor: COLORS.surface, 
+    backgroundColor: COLORS.surface,
     borderRadius: RADIUS.lg,
     padding: 25,
     marginBottom: 20,
@@ -320,9 +370,9 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.info, // Themed color
     paddingVertical: 8,
     paddingHorizontal: 15,
-    borderRadius: RADIUS.pill, 
-    flexDirection: 'row',
-    alignItems: 'center',
+    borderRadius: RADIUS.pill,
+    flexDirection: "row",
+    alignItems: "center",
     gap: 5,
   },
   imagePickerButtonText: {
@@ -333,12 +383,12 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 15,
     fontWeight: "700",
-    color: COLORS.primaryDark, 
-    marginBottom: 6
+    color: COLORS.primaryDark,
+    marginBottom: 6,
   },
   value: {
     fontSize: 16,
-    color: COLORS.mutedDark, 
+    color: COLORS.mutedDark,
     marginBottom: 15,
     paddingVertical: 10,
     borderBottomWidth: 1,
@@ -365,7 +415,7 @@ const styles = StyleSheet.create({
   editButton: {
     backgroundColor: COLORS.info, // Themed color
     paddingVertical: 14,
-    borderRadius: RADIUS.pill, 
+    borderRadius: RADIUS.pill,
     alignItems: "center",
     flex: 1,
     ...SHADOWS.soft,
@@ -387,7 +437,7 @@ const styles = StyleSheet.create({
   buttonText: {
     color: COLORS.surface,
     fontSize: 16,
-    fontWeight: "700"
+    fontWeight: "700",
   },
   // --- Logout Button (New) ---
   logoutButton: {
@@ -395,9 +445,9 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: RADIUS.pill,
     alignItems: "center",
-    justifyContent: 'center',
+    justifyContent: "center",
     marginTop: 30,
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 10,
     ...SHADOWS.soft,
     shadowColor: COLORS.danger,
@@ -405,6 +455,6 @@ const styles = StyleSheet.create({
   logoutButtonText: {
     color: COLORS.surface,
     fontSize: 16,
-    fontWeight: "800"
-  }
+    fontWeight: "800",
+  },
 });

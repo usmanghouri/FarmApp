@@ -16,6 +16,10 @@ import * as ImagePicker from "expo-image-picker";
 import { apiClient } from "../api/client";
 import { COLORS, SHADOWS, RADIUS } from "../styles/theme";
 
+// Cloudinary configuration
+const CLOUDINARY_CLOUD_NAME = "dn5edjpzg";
+const CLOUDINARY_UPLOAD_PRESET = "FarmConnect";
+
 const EMPTY_PROFILE = {
   name: "",
   email: "",
@@ -43,7 +47,9 @@ export default function FarmerProfileScreen({ navigation }) {
   const fetchProfile = async () => {
     try {
       setLoading(true);
-      const response = await apiClient.get("/api/farmers/me", { withCredentials: true });
+      const response = await apiClient.get("/api/farmers/me", {
+        withCredentials: true,
+      });
       const user = response.data?.user || {};
       const mapped = {
         name: user.name || "",
@@ -55,7 +61,11 @@ export default function FarmerProfileScreen({ navigation }) {
       setProfile(mapped);
       setForm(mapped);
     } catch (error) {
-      setBanner(error?.response?.data?.message || error.message || "Failed to load profile");
+      setBanner(
+        error?.response?.data?.message ||
+          error.message ||
+          "Failed to load profile"
+      );
     } finally {
       setLoading(false);
     }
@@ -72,16 +82,22 @@ export default function FarmerProfileScreen({ navigation }) {
     }
   };
 
-  const handleFormChange = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
-  const handlePasswordChange = (key, value) => setPasswordForm((prev) => ({ ...prev, [key]: value }));
+  const handleFormChange = (key, value) =>
+    setForm((prev) => ({ ...prev, [key]: value }));
+  const handlePasswordChange = (key, value) =>
+    setPasswordForm((prev) => ({ ...prev, [key]: value }));
 
   const pickImage = async () => {
     try {
       // Request permission
-      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      
+      const permissionResult =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+
       if (!permissionResult.granted) {
-        Alert.alert("Permission Required", "Please allow access to your photo library to update profile picture.");
+        Alert.alert(
+          "Permission Required",
+          "Please allow access to your photo library to update profile picture."
+        );
         return;
       }
 
@@ -106,35 +122,43 @@ export default function FarmerProfileScreen({ navigation }) {
   const uploadImage = async (uri) => {
     try {
       setUploadingImage(true);
-      
-      // Create form data
-      const uploadFormData = new FormData();
-      const filename = uri.split('/').pop();
-      const match = /\.(\w+)$/.exec(filename);
-      const type = match ? `image/${match[1]}` : 'image/jpeg';
 
-      uploadFormData.append('image', {
-        uri,
-        name: filename,
-        type,
+      // Upload to Cloudinary first (like web version)
+      const formData = new FormData();
+      formData.append("file", {
+        uri: uri,
+        name: "upload.jpg",
+        type: "image/jpeg",
       });
+      formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
 
-      // Upload to server
-      const response = await apiClient.post('/api/farmers/upload-image', uploadFormData, {
-        withCredentials: true,
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      const response = await fetch(
+        `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+        {
+          method: "POST",
+          body: formData,
+          // Don't set Content-Type manually - React Native will set it with boundary
+        }
+      );
 
-      if (response.data?.imageUrl) {
-        setForm((prev) => ({ ...prev, img: response.data.imageUrl }));
-        showBanner("Profile picture updated successfully!");
-        fetchProfile();
+      if (!response.ok) {
+        throw new Error(`Upload failed with status ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.secure_url) {
+        // Update form with Cloudinary URL
+        setForm((prev) => ({ ...prev, img: data.secure_url }));
+        showBanner(
+          "Image uploaded successfully! Click Save to update profile."
+        );
+      } else {
+        throw new Error(data.error?.message || "Failed to get image URL");
       }
     } catch (error) {
       console.error("Image upload error:", error);
-      showBanner(error?.response?.data?.message || "Failed to upload image");
+      showBanner(error?.message || "Failed to upload image");
     } finally {
       setUploadingImage(false);
     }
@@ -150,17 +174,27 @@ export default function FarmerProfileScreen({ navigation }) {
 
   const saveProfile = async () => {
     try {
-      await apiClient.put("/api/farmers/update", form, { withCredentials: true });
+      await apiClient.put("/api/farmers/update", form, {
+        withCredentials: true,
+      });
       showBanner("Profile updated successfully!");
       setIsEditing(false);
       fetchProfile();
     } catch (error) {
-      showBanner(error?.response?.data?.message || error.message || "Failed to update profile");
+      showBanner(
+        error?.response?.data?.message ||
+          error.message ||
+          "Failed to update profile"
+      );
     }
   };
 
   const changePassword = async () => {
-    if (!passwordForm.oldPassword || !passwordForm.newPassword || !passwordForm.confirmPassword) {
+    if (
+      !passwordForm.oldPassword ||
+      !passwordForm.newPassword ||
+      !passwordForm.confirmPassword
+    ) {
       showBanner("Fill all password fields.");
       return;
     }
@@ -185,17 +219,21 @@ export default function FarmerProfileScreen({ navigation }) {
       setPasswordForm(EMPTY_PASSWORD);
       setIsChangingPassword(false);
     } catch (error) {
-      showBanner(error?.response?.data?.message || error.message || "Failed to change password. Check old password.");
+      showBanner(
+        error?.response?.data?.message ||
+          error.message ||
+          "Failed to change password. Check old password."
+      );
     }
   };
 
   const logout = async () => {
     try {
-      await apiClient.get("/api/farmers/logout", { withCredentials: true }); 
-      navigation?.navigate?.("Landing"); 
+      await apiClient.get("/api/farmers/logout", { withCredentials: true });
+      navigation?.navigate?.("Landing");
     } catch (error) {
       showBanner("Logout failed.");
-      navigation?.navigate?.("Landing"); 
+      navigation?.navigate?.("Landing");
     }
   };
 
@@ -210,10 +248,16 @@ export default function FarmerProfileScreen({ navigation }) {
           style: "destructive",
           onPress: async () => {
             try {
-              await apiClient.delete("/api/farmers/delete", { withCredentials: true });
+              await apiClient.delete("/api/farmers/delete", {
+                withCredentials: true,
+              });
               navigation?.navigate?.("Landing");
             } catch (error) {
-              showBanner(error?.response?.data?.message || error.message || "Failed to delete account");
+              showBanner(
+                error?.response?.data?.message ||
+                  error.message ||
+                  "Failed to delete account"
+              );
             }
           },
         },
@@ -230,9 +274,13 @@ export default function FarmerProfileScreen({ navigation }) {
     );
   }
 
-  const avatarUri = form.img || "https://i.ibb.co/0jqp8Qf/avatar.png"; 
+  const avatarUri = form.img || "https://i.ibb.co/0jqp8Qf/avatar.png";
 
-  const bannerStyle = banner.toLowerCase().includes("success") ? styles.bannerSuccess : (banner ? styles.bannerError : null);
+  const bannerStyle = banner.toLowerCase().includes("success")
+    ? styles.bannerSuccess
+    : banner
+    ? styles.bannerError
+    : null;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -242,7 +290,9 @@ export default function FarmerProfileScreen({ navigation }) {
       >
         <View style={styles.header}>
           <Text style={styles.heading}>Farmer Profile</Text>
-          <Text style={styles.subHeading}>Manage your personal information and security settings.</Text>
+          <Text style={styles.subHeading}>
+            Manage your personal information and security settings.
+          </Text>
         </View>
 
         {banner ? (
@@ -278,7 +328,11 @@ export default function FarmerProfileScreen({ navigation }) {
                 {Object.keys(EMPTY_PASSWORD).map((key, index) => (
                   <View key={key} style={styles.formGroup}>
                     <Text style={styles.label}>
-                      {["Old Password", "New Password", "Confirm Password"][index]}
+                      {
+                        ["Old Password", "New Password", "Confirm Password"][
+                          index
+                        ]
+                      }
                     </Text>
                     <TextInput
                       style={styles.input}
@@ -296,7 +350,7 @@ export default function FarmerProfileScreen({ navigation }) {
               <>
                 <Text style={styles.sectionTitle}>Edit Details</Text>
                 {Object.keys(EMPTY_PROFILE).map((key) => {
-                  if (key === "email" || key === "img") return null; 
+                  if (key === "email" || key === "img") return null;
                   return (
                     <View key={key} style={styles.formGroup}>
                       <Text style={styles.label}>
@@ -322,7 +376,11 @@ export default function FarmerProfileScreen({ navigation }) {
                   <View>
                     <Text style={styles.nameText}>{profile.name}</Text>
                     <View style={styles.locationRow}>
-                      <Feather name="map-pin" size={16} color={COLORS.primaryDark} />
+                      <Feather
+                        name="map-pin"
+                        size={16}
+                        color={COLORS.primaryDark}
+                      />
                       <Text style={styles.locationText}>
                         {profile.address || "Address incomplete"}
                       </Text>
@@ -335,23 +393,24 @@ export default function FarmerProfileScreen({ navigation }) {
                 </View>
 
                 <View style={styles.infoGrid}>
-  <View style={styles.infoCard}>
-    <View style={styles.infoHeaderRow}>
-      <Feather name="mail" size={20} color={COLORS.info} />
-      <Text style={styles.infoLabel}>Email Address</Text>
-    </View>
-    <Text style={styles.infoValue}>{profile.email}</Text>
-  </View>
+                  <View style={styles.infoCard}>
+                    <View style={styles.infoHeaderRow}>
+                      <Feather name="mail" size={20} color={COLORS.info} />
+                      <Text style={styles.infoLabel}>Email Address</Text>
+                    </View>
+                    <Text style={styles.infoValue}>{profile.email}</Text>
+                  </View>
 
-  <View style={styles.infoCard}>
-    <View style={styles.infoHeaderRow}>
-      <Feather name="phone" size={20} color={COLORS.info} />
-      <Text style={styles.infoLabel}>Contact Number</Text>
-    </View>
-    <Text style={styles.infoValue}>{profile.phone || "N/A"}</Text>
-  </View>
-</View>
-
+                  <View style={styles.infoCard}>
+                    <View style={styles.infoHeaderRow}>
+                      <Feather name="phone" size={20} color={COLORS.info} />
+                      <Text style={styles.infoLabel}>Contact Number</Text>
+                    </View>
+                    <Text style={styles.infoValue}>
+                      {profile.phone || "N/A"}
+                    </Text>
+                  </View>
+                </View>
               </>
             )}
           </View>
@@ -418,7 +477,7 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     // IMPROVEMENT: Softer, branded background color
-    backgroundColor: '#F0FFF0', 
+    backgroundColor: "#F0FFF0",
   },
   contentContainer: {
     paddingHorizontal: 20,
@@ -429,7 +488,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: '#F0FFF0',
+    backgroundColor: "#F0FFF0",
   },
   loadingText: {
     marginTop: 8,
@@ -473,7 +532,7 @@ const styles = StyleSheet.create({
     color: COLORS.surface, // White text for maximum contrast
     fontWeight: "700",
     fontSize: 15,
-    textAlign: 'center',
+    textAlign: "center",
   },
   // --- Profile Card ---
   profileCard: {
@@ -495,7 +554,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     borderWidth: 4, // Thicker border
     borderColor: COLORS.primary,
-    position: 'relative',
+    position: "relative",
   },
   avatar: {
     width: "100%",
@@ -550,33 +609,33 @@ const styles = StyleSheet.create({
     fontSize: 14, // Slightly larger text
   },
   infoCard: {
-  backgroundColor: "#F7FFF7",
-  borderRadius: RADIUS.md,
-  padding: 14,
-  width: "100%",
-  elevation: 2,
-},
+    backgroundColor: "#F7FFF7",
+    borderRadius: RADIUS.md,
+    padding: 14,
+    width: "100%",
+    elevation: 2,
+  },
 
-infoHeaderRow: {
-  flexDirection: "row",
-  alignItems: "center",
-  gap: 8,
-  marginBottom: 6,   // creates spacing before value
-},
+  infoHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 6, // creates spacing before value
+  },
 
-infoLabel: {
-  fontSize: 14,
-  color: COLORS.mutedDark,
-  fontWeight: "600",
-},
+  infoLabel: {
+    fontSize: 14,
+    color: COLORS.mutedDark,
+    fontWeight: "600",
+  },
 
-infoValue: {
-  color: COLORS.primaryDark,
-  fontWeight: "700",
-  fontSize: 15,
-  
-  marginLeft: 28, // aligns under label instead of icon
-},
+  infoValue: {
+    color: COLORS.primaryDark,
+    fontWeight: "700",
+    fontSize: 15,
+
+    marginLeft: 28, // aligns under label instead of icon
+  },
 
   // --- Form View ---
   input: {
@@ -585,7 +644,7 @@ infoValue: {
     borderRadius: RADIUS.md,
     paddingHorizontal: 15, // More padding
     paddingVertical: 12, // Taller input
-    backgroundColor: '#F9F9F9', // Slight contrast background for inputs
+    backgroundColor: "#F9F9F9", // Slight contrast background for inputs
     color: COLORS.mutedDark,
     fontSize: 16,
   },
@@ -622,7 +681,7 @@ infoValue: {
     borderColor: COLORS.primary, // Primary color border
   },
   secondaryText: {
-    color: COLORS.primary, 
+    color: COLORS.primary,
     fontWeight: "700",
     fontSize: 15,
   },
